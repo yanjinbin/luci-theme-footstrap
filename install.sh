@@ -16,16 +16,16 @@
 # GitHub downloads go through gh-proxy.com by default; override with GITHUB_PROXY=... or disable
 # with GITHUB_PROXY=.
 #
-# SINCE THE SPLIT the theme and the updater ship from TWO repos with their own tags: the theme from
-# yanjinbin/luci-theme-footstrap, the updater from VizzleTF/luci-app-footstrap-updater. This installer
-# resolves each from its own latest release and verifies both against the one release key. The theme
-# is always installed; the updater is OPTIONAL and the installer asks (or FOOTSTRAP_UPDATER=1/0 decides
-# non-interactively). Licensed Apache-2.0.
+# SINCE THE SPLIT the theme and the updater ship from TWO repos with their own tags. This script may
+# live in a fork, but it defaults to the UPSTREAM release feeds unless you override the env vars
+# below. That keeps `raw/.../install.sh` forkable without requiring every fork to publish signed
+# releases on day one. The theme is always installed; the updater is OPTIONAL and the installer asks
+# (or FOOTSTRAP_UPDATER=1/0 decides non-interactively). Licensed Apache-2.0.
 
 set -e
 
-REPO_THEME="yanjinbin/luci-theme-footstrap"
-REPO_UPDATER="VizzleTF/luci-app-footstrap-updater"
+REPO_THEME="${FOOTSTRAP_THEME_REPO:-VizzleTF/luci-theme-footstrap}"
+REPO_UPDATER="${FOOTSTRAP_UPDATER_REPO:-VizzleTF/luci-app-footstrap-updater}"
 TAG="latest"		# pins the THEME tag only; the updater always resolves its own latest
 ACTIVATE=0
 GITHUB_PROXY="${GITHUB_PROXY:-https://gh-proxy.com/}"
@@ -49,6 +49,8 @@ usage() {
 
 	Environment:
 	  GITHUB_PROXY=https://gh-proxy.com/   prefix used for GitHub/raw/API downloads
+	  FOOTSTRAP_THEME_REPO=owner/repo      release repository for the theme package
+	  FOOTSTRAP_UPDATER_REPO=owner/repo    release repository for the updater package
 	  FOOTSTRAP_UPDATER=1|0                force installing/skipping the updater package
 	  FOOTSTRAP_ALLOW_UNVERIFIED=1         override missing digest/signature checks
 	EOF
