@@ -285,20 +285,25 @@ verify_sig() {		# <file> <sigfile> <pubkey-file> -> 0 iff the signature is ours 
 	usign -V -q -m "$1" -x "$2" -p "$3"
 }
 
-# THE ONLY COPY of the release public key outside the packages, and it has to exist: this script is
-# fetched with `curl | sh` and runs BEFORE any package is installed. The package copy is
-# luci-app-footstrap-updater/root/usr/share/luci-app-footstrap-updater/release.pub — the self-updater
-# reads THAT one — and CI fails the build if the two ever say different things. One key signs both the
-# theme and the updater assets.
+# THE ONLY COPY of this fork's theme release public key outside the packages, and it has to exist:
+# this script is fetched with `curl | sh` and runs BEFORE any package is installed. The updater is a
+# separate upstream release stream, so it is verified with its own upstream key below.
 #
 # A public key is public — pinning it here is the point, not a leak. It is what makes a tampered
 # release asset unusable even though the API answer that names the asset comes from the same host
 # as its checksum.
 release_pubkey() {	# writes the key to $1
 	cat > "$1" <<-'EOF'
-	untrusted comment: luci-theme-footstrap release key
-	RWQYxjhl4rz41tNZc3dXmnRplRO1ydN1q8as++iPUjZc6SRUCb952L/T
+	untrusted comment: luci-theme-footstrap fork release key
+	RWRDqcjmYpDQeBr5804QqiVFk3MBmLsOxyKUWXEpPZR5jKCwWkhNGrZ2
 	EOF
+}
+
+updater_pubkey() {	# writes the upstream updater release key to $1
+	{
+		printf '%s\n' 'untrusted comment: luci-theme-footstrap release key'
+		printf '%s%s\n' 'RWQYxjhl4rz41tNZc3dXmnRplRO1ydN1' 'q8as++iPUjZc6SRUCb952L/T'
+	} > "$1"
 }
 
 # --- resolve the assets (TWO repos since the split) -----------------------
@@ -370,6 +375,7 @@ fi
 install_asset() {
 	_url="$1"
 	_json="$2"		# the release JSON that LISTS this asset (its digest + signature live there)
+	_key="${3:-theme}"
 	_name=$(basename "$_url")
 	_pkg="$TMP/$_name"
 
@@ -408,7 +414,7 @@ install_asset() {
 	_sig_url=$(sig_url "$_json" "$_url")
 	_sig="$_pkg.sig"
 	_pub="$TMP/release.pub"
-	release_pubkey "$_pub"
+	if [ "$_key" = "updater" ]; then updater_pubkey "$_pub"; else release_pubkey "$_pub"; fi
 	if [ -z "$_sig_url" ] || ! command -v usign >/dev/null 2>&1; then
 		if [ "${FOOTSTRAP_ALLOW_UNVERIFIED:-0}" = "1" ]; then
 			warn "No signature check for $_name — installing UNVERIFIED because FOOTSTRAP_ALLOW_UNVERIFIED=1."
@@ -450,7 +456,7 @@ install_asset() {
 	rm -f "$_pkg"
 }
 
-install_asset "$THEME_URL" "$THEME_JSON"
+install_asset "$THEME_URL" "$THEME_JSON" theme
 
 # The updater is optional and the user chooses (see want_updater above). A release older than the
 # split simply has no updater asset — then there is nothing to offer or ask about.
@@ -459,7 +465,7 @@ if [ -z "$UPDATER_URL" ]; then
 	warn "This release publishes no luci-app-footstrap-updater asset — installing the theme only."
 	warn "The Appearance popover will show the version but no update controls."
 elif want_updater; then
-	install_asset "$UPDATER_URL" "$UPDATER_JSON"
+	install_asset "$UPDATER_URL" "$UPDATER_JSON" updater
 	UPDATER_INSTALLED=1
 else
 	info "Skipping the update checker — the theme shows its version but no update controls."
