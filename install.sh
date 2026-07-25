@@ -9,23 +9,22 @@
 # Optional:
 #   ... | sh -s -- --activate      # install and switch to Footstrap
 #   ... | sh -s -- --upgrade       # upgrade an already installed theme to latest
-#   ... | sh -s -- v0.9.3          # pin the THEME tag (the updater still takes its own latest)
-#   ... | sh -s -- v0.9.3 --activate
+#   ... | sh -s -- v0.10.3         # pin the THEME tag (the updater still takes its own latest)
+#   ... | sh -s -- v0.10.3 --activate
 #
 # The installer ASKS whether to install the update checker (luci-app-footstrap-updater). Force the
 # answer without a prompt (scripted installs):  FOOTSTRAP_UPDATER=1 (install) / =0 (theme only).
 # GitHub downloads go through gh-proxy.com by default; override with GITHUB_PROXY=... or disable
 # with GITHUB_PROXY=.
 #
-# SINCE THE SPLIT the theme and the updater ship from TWO repos with their own tags. This script may
-# live in a fork, but it defaults to the UPSTREAM release feeds unless you override the env vars
-# below. That keeps `raw/.../install.sh` forkable without requiring every fork to publish signed
-# releases on day one. The theme is always installed; the updater is OPTIONAL and the installer asks
-# (or FOOTSTRAP_UPDATER=1/0 decides non-interactively). Licensed Apache-2.0.
+# SINCE THE SPLIT the theme and the updater ship from TWO repos with their own tags. This fork's
+# installer defaults to this fork's theme releases; the updater stays on its upstream release feed
+# unless FOOTSTRAP_UPDATER_REPO overrides it. The theme is always installed; the updater is OPTIONAL
+# and the installer asks (or FOOTSTRAP_UPDATER=1/0 decides non-interactively). Licensed Apache-2.0.
 
 set -e
 
-REPO_THEME="${FOOTSTRAP_THEME_REPO:-VizzleTF/luci-theme-footstrap}"
+REPO_THEME="${FOOTSTRAP_THEME_REPO:-yanjinbin/luci-theme-footstrap}"
 REPO_UPDATER="${FOOTSTRAP_UPDATER_REPO:-VizzleTF/luci-app-footstrap-updater}"
 TAG="latest"		# pins the THEME tag only; the updater always resolves its own latest
 ACTIVATE=0

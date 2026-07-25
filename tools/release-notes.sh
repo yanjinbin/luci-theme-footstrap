@@ -115,7 +115,7 @@ cat <<EOF
 
 One-liner (auto-detects apk/ipk):
 \`\`\`sh
-wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+wget -qO- https://gh-proxy.com/https://raw.githubusercontent.com/yanjinbin/luci-theme-footstrap/main/install.sh | sh
 \`\`\`
 </details>
 EOF

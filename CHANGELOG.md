@@ -11,6 +11,16 @@ Style and format guide: [docs/21-changelog-style-and-format.md](docs/21-changelo
 
 Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
+## [0.10.3] — 2026-07-25
+
+### Changed
+
+- **The installer now resolves theme packages from the fork release stream by default.** The one-line install already loads this fork's script through `gh-proxy.com`; its release lookup now follows the same owner/repo instead of silently falling back to upstream packages. The optional updater still uses its own upstream release feed unless `FOOTSTRAP_UPDATER_REPO` overrides it.
+
+### Fixed
+
+- **The Footstrap Overview helper is no longer registered as a global LuCI status include.** The port-card layout logic moved out of LuCI's shared `status/include` autoload directory and is wired only by Footstrap's own chrome. Switching away from Footstrap therefore leaves the stock Overview component tree untouched, while Footstrap keeps the same intended Overview UI when it is the active theme.
+
 ## [0.10.2] — 2026-07-24
 
 ### Changed
@@ -3037,6 +3047,7 @@ line, not one per tag. The individual patch releases are in the git history.
   nested `calc()`, which broke the layout outright. JS minification came back in 0.7.12,
   once jsmin was proven safe by a token-equivalence gate.
 
+[0.10.3]: https://github.com/yanjinbin/luci-theme-footstrap/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/VizzleTF/luci-theme-footstrap/compare/v0.9.7...v0.10.0
