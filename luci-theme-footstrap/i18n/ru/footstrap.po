@@ -155,7 +155,7 @@ msgstr "Выход"
 msgid "Lua compatibility mode active"
 msgstr "Включён режим совместимости с Lua"
 
-#: htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js:22
+#: htdocs/luci-static/resources/fs-overview.js:22
 msgid "Memory"
 msgstr "Память"
 
@@ -288,7 +288,7 @@ msgctxt "footstrap"
 msgid "Start typing to find a page"
 msgstr "Начните вводить название страницы"
 
-#: htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js:22
+#: htdocs/luci-static/resources/fs-overview.js:22
 msgid "Storage"
 msgstr "Накопитель"
 
@@ -297,7 +297,7 @@ msgctxt "footstrap"
 msgid "Submenus"
 msgstr "Подменю"
 
-#: htdocs/luci-static/resources/view/status/include/05_footstrap_overview_layout.js:22
+#: htdocs/luci-static/resources/fs-overview.js:22
 msgid "System"
 msgstr "Система"
 

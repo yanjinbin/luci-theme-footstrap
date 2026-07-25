@@ -4,14 +4,12 @@
 'require network';
 'require fs-fit as fit';
 
-/* Footstrap overview LAYOUT-only include: renders NOTHING of its own, only re-arranges the STOCK
+/* Footstrap overview LAYOUT-only module: renders NOTHING of its own, only re-arranges the STOCK
  * sections — wrapping System / Memory / Storage in a grid so Memory and Storage sit in a right
  * column beside System. Content, data and styling stay luci-mod-status's. (Do not go back to the
  * old 05_footstrap_dashboard.js: re-rendering a custom tree every poll flickered and reset mobile
  * scroll.) The stock poll updates each section IN PLACE via dom.content() and never rebuilds the
- * .cbi-section wrapper, so once moved into our grid the wrappers stay put across polls.
- *
- * Installed to the global include dir, so LuCI loads it under EVERY theme — hence the gate. */
+ * .cbi-section wrapper, so once moved into our grid the wrappers stay put across polls. */
 function isFootstrapTheme() {
 	return String(L.env.media || '').indexOf('footstrap') >= 0;
 }
@@ -79,7 +77,7 @@ function arrange() {
  * The SPA router may REPLACE the #view element between visits, so re-attach when the node we
  * observed is no longer the current one: a singleton bound to the first #view would silently
  * watch a detached tree and the grid would never apply on a later SPA visit. */
-let _observer = null, _observedView = null;
+let _observer = null, _observedView = null, _routeObserver = null;
 function stopWatch() {
 	if (_observer) _observer.disconnect();
 	_observer = null;
@@ -91,12 +89,29 @@ function watch() {
 	if (_observer && _observedView !== view)
 		stopWatch();
 	arrange();
-	if (_observer || !view) return;
+	if (_observer || !view || (document.body.getAttribute('data-page') || '') !== 'admin-status-overview')
+		return;
 	_observedView = view;
 	/* one arrange() per frame, however many mutations a poll tick delivers (fit.frame — the
 	 * theme's shared coalescer, fs-fit.js) */
 	_observer = new MutationObserver(fit.frame(arrange));
 	_observer.observe(view, { childList: true, subtree: true });
+}
+
+function wire() {
+	if (_routeObserver || !document.body)
+		return;
+	_routeObserver = new MutationObserver(() => {
+		if ((document.body.getAttribute('data-page') || '') === 'admin-status-overview')
+			watch();
+		else
+			stopWatch();
+	});
+	_routeObserver.observe(document.body, { attributes: true, attributeFilter: [ 'data-page' ] });
+	if (document.readyState === 'loading')
+		document.addEventListener('DOMContentLoaded', watch, { once: true });
+	else
+		watch();
 }
 
 /* ---- progressive paint -----------------------------------------------------
@@ -244,12 +259,5 @@ if (isFootstrapTheme())
 	patchOverview();
 
 return baseclass.extend({
-	title: '',            /* no section title -> stock renders an empty wrapper */
-	render() {
-		if (!isFootstrapTheme())
-			return E([]);
-		watch();
-		/* marker lets CSS hide our own empty stock .cbi-section wrapper */
-		return E('div', { 'class': 'fs-ovl-marker', 'style': 'display:none' });
-	}
+	wire
 });

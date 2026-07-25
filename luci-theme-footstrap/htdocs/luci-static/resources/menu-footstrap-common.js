@@ -6,6 +6,7 @@
 'require fs-chrome as chrome';
 'require fs-router as router';
 'require fs-appearance as appearance';
+'require fs-overview as overview';
 'require fs-prefs as prefs';
 'require fs-sheets as sheets';
 'require fs-search as search';
@@ -21,6 +22,7 @@
  *   fs-sheets      the guard against a view's injected CSS repainting every later page
  *   fs-search      the page-search palette (indexes the same tree, on first open)
  *   fs-appearance  the popover
+ *   fs-overview    Footstrap-owned overview layout watcher, outside LuCI's global include path
  *   fs-version     the shipped version string (shown in the popover, no network)
  *
  * The version CHECK and the one-click self-update (fs-update.js) ship in the OPTIONAL
@@ -66,6 +68,7 @@ return baseclass.extend({
 			search.wire();
 			chrome.wireRail();
 			chrome.wireIndicatorCounts();
+			overview.wire();
 			router.wire();
 			router.wireVisibility();
 		/* fs-chrome's renderTabMenu warns about exactly this, and the root chain was left bare: a
