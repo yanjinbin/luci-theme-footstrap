@@ -16,9 +16,9 @@
 	const empty_password = (getuid() == 0 && getspnam('root')?.pwdp === '');
 	/* The ROUTER's saved Appearance defaults (Appearance -> Save as default, in /etc/config/footstrap):
 	   head.ut stamps them before paint and the client's own localStorage overrides every one — the
-	   browser choice always wins. Layout falls back to the legacy migration seed
-	   luci.main.footstrap_layout=top, which uci-defaults sets for a router upgraded from the old
-	   top-nav theme (a shell script cannot write localStorage). Absent = the built-in defaults.
+	   browser choice always wins. A router upgraded from the old top-nav theme gets its default
+	   layout seeded into the same footstrap config, so no Footstrap-specific knob leaks into
+	   luci.main. Absent = the built-in defaults.
 
 	   `uci` and `config` come from the render scope, which dispatcher.uc builds per request: `uci` is
 	   already a cursor (dispatcher.uc `let uci = cursor()`) and `config.main` is already
@@ -27,7 +27,7 @@
 	   and left this template reaching for UCI a different way than sysauth.ut does. */
 	const fsd = uci.get_all('footstrap', 'settings') ?? {};
 	const fs_defaults = {
-		layout:       fsd.layout || config.main.footstrap_layout || '',
+		layout:       fsd.layout || '',
 		darkmode:     fsd.darkmode || '',
 		palette:      fsd.palette || '',
 		wallpaper:    fsd.wallpaper || '',

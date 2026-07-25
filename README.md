@@ -59,7 +59,7 @@ A set you like can be saved as the router-wide default, so a fresh browser start
 <br clear="right">
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+wget -qO- https://gh-proxy.com/https://raw.githubusercontent.com/yanjinbin/luci-theme-footstrap/main/install.sh | sh
 ```
 
 Then pick **Footstrap** in **System → System → Language and Style**, field "Design". That is the only

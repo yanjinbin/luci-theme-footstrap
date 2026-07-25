@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# FRESH INSTALL OR UPGRADE? A fresh install may activate this theme; an upgrade must NEVER change
-# the theme the user is on. The guard used to be `[ "$PKG_UPGRADE" = 1 ]` alone — apk never sets
+# FRESH INSTALL OR UPGRADE? An upgrade must NEVER change the theme the user is on. The guard used
+# to be `[ "$PKG_UPGRADE" = 1 ]` alone — apk never sets
 # that and neither does postinst, so only dev-sync.sh (which exports it by hand) ever took the
 # upgrade branch: on a real router the guard was DEAD, and an upgrade that found an empty
 # mediaurlbase would activate this theme behind the user's back. The marker file is the state that
@@ -29,27 +29,33 @@ done
 # The ONE theme entry: sidebar and top bar are one template morphed by :root[data-layout].
 uci set luci.themes.Footstrap=/luci-static/footstrap
 
-# Normalise the active theme. Every legacy media path below is now neither registered in
-# luci.themes nor on disk, so an install left pointing at one is stranded: the Design page does
-# not list it (it cannot be switched away from) and its media dir 404s. They all map onto the one
-# surviving path. Non-footstrap themes are left alone; a fresh install defaults to footstrap.
+# Ensure the theme-specific config exists before any migration seeds are written into it.
+[ -f /etc/config/footstrap ] || touch /etc/config/footstrap
+if ! uci -q get footstrap.settings >/dev/null 2>&1; then
+	uci set footstrap.settings=footstrap
+fi
+
+# Normalise the active theme only for legacy FOOTSTRAP paths. Every legacy media path below is now
+# neither registered in luci.themes nor on disk, so an install left pointing at one is stranded:
+# the Design page does not list it (it cannot be switched away from) and its media dir 404s. They
+# all map onto the one surviving path. Non-footstrap themes are left alone, and a fresh install no
+# longer activates Footstrap behind the user's back.
 #
-# MIGRATION — a router that was on the top-nav theme must STAY on the top bar. The layout lives
-# in the browser (localStorage 'fs-layout') and a shell script cannot write that, so carry it
-# server-side: footstrap_layout is the router's DEFAULT layout, which head.ut stamps onto
-# <html data-layout> and the client's own choice then overrides. Set only when the old path says
-# top-nav, and only if unset, so a re-run never clobbers a deliberate change.
+# MIGRATION — a router that was on the top-nav theme must STAY on the top bar. The layout lives in
+# the browser (localStorage 'fs-layout') and a shell script cannot write that, so carry it in the
+# theme's own config: footstrap.settings.layout is the router's DEFAULT layout, which head.ut
+# stamps onto <html data-layout> and the client's own choice then overrides. Set only when the old
+# path says top-nav, and only if unset, so a re-run never clobbers a deliberate change.
 cur=$(uci -q get luci.main.mediaurlbase)
 new=$cur
 case "$cur" in
 	# was on the top-nav theme (incl. its legacy dark/light variants) -> keep the bar
 	/luci-static/footstrap-top*)
-		[ -n "$(uci -q get luci.main.footstrap_layout)" ] || \
-			uci set luci.main.footstrap_layout=top
+		[ -n "$(uci -q get footstrap.settings.layout)" ] || \
+			uci set footstrap.settings.layout=top
 		new=/luci-static/footstrap ;;
 	# any other footstrap path (incl. the legacy -dark/-light) -> the sidebar default
 	/luci-static/footstrap*)          new=/luci-static/footstrap ;;
-	"") [ "$PKG_UPGRADE" = 1 ] || new=/luci-static/footstrap ;;
 esac
 
 # Last-resort guard against a blank UI: whatever stays active must be on disk — media dir AND
@@ -77,15 +83,9 @@ esac
 uci commit luci
 
 # Appearance "Save as default" writes the router-wide axis defaults into /etc/config/footstrap
-# through the scoped uci ACL (config 'footstrap' only). The rpcd uci `set` backend the browser
-# calls needs the section to ALREADY EXIST, so guarantee it here — the shipped conffile carries it,
-# but a router that installed a footstrap predating this feature has no such file. `uci set` refuses
-# to CREATE the config file (only the section within one), so touch it first. Idempotent.
-[ -f /etc/config/footstrap ] || touch /etc/config/footstrap
-if ! uci -q get footstrap.settings >/dev/null 2>&1; then
-	uci set footstrap.settings=footstrap
-	uci commit footstrap
-fi
+# through the scoped uci ACL (config 'footstrap' only). The section was guaranteed above so both
+# the migration seed and the browser writer have the same home.
+uci commit footstrap
 
 # Login/page background upload (Appearance -> Background image). cgi-upload writes the image to
 # /etc/footstrap/login-bg (a fixed, ACL-scoped path — kept in /etc so it survives a package upgrade

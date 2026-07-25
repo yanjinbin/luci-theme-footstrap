@@ -20,9 +20,10 @@ Appearance: `localStorage` + атрибуты на `:root`, ничего не п
 рендерера и симлинка `footstrap-top` не существует.
 
 **Граница темы:** тема даёт хром и дизайн-язык; контент страниц рисует view-JS
-`luci-mod-*`. Единственное исключение — `05_footstrap_overview_layout.js`: он
-не рисует своего контента, а только переставляет штатные секции overview.
-Подробно — `../docs/08-design-system.md`, раздел «Границы», и `../CLAUDE.md`.
+`luci-mod-*`. Overview-раскладка теперь грузится из собственного ресурса темы,
+а не из глобального `view/status/include`, так что после переключения на другую
+тему Footstrap не продолжает вмешиваться в штатный Overview. Подробно —
+`../docs/08-design-system.md`, раздел «Границы», и `../CLAUDE.md`.
 
 ## Структура
 
@@ -36,7 +37,7 @@ htdocs/luci-static/footstrap/     cascade.css (генерируется), fonts/
 htdocs/luci-static/resources/     menu-footstrap.js (рендерер), menu-footstrap-common.js (bootstrap),
                                   fs-{menutree,prefs,widgets,chrome,router,sheets,version,appearance}.js,
                                   fs-fit.js, fs-select.js
-  …/view/status/include/          05_footstrap_overview_layout.js
+htdocs/luci-static/resources/     fs-overview.js (theme-owned overview layout watcher)
 root/etc/uci-defaults/            регистрация темы и миграция легаси-имён
 root/usr/share/rpcd/acl.d/        luci-theme-footstrap.json (ACL: uci footstrap — Save-as-default)
 ```

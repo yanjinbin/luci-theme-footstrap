@@ -41,7 +41,7 @@
 		margin-top: var(--fs-space-0-5);
 	}
 
-	/* Stock overview layout: 05_footstrap_overview_layout.js wraps the stock System / Memory
+	/* Stock overview layout: fs-overview.js wraps the stock System / Memory
 	 * / Storage sections in .fs-ovl; this is the grid only — System left across both rows,
 	 * Memory + Storage right. Stock styling and data untouched. */
 	/* the chrome already shows the page title, so the stock <h2> is a duplicate */

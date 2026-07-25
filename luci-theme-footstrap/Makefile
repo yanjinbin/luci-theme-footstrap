@@ -127,10 +127,6 @@ LEGACY_THEMES="Footstrap FootstrapDark FootstrapLight FootstrapTop FootstrapTopD
 	for t in $$LEGACY_THEMES; do
 		uci -q delete "luci.themes.$$t"
 	done
-	# The router's DEFAULT layout, set by uci-defaults when migrating an old top-nav install.
-	# It means nothing to any other theme, and left behind it would silently re-apply the top
-	# bar on a later reinstall.
-	uci -q delete luci.main.footstrap_layout
 	# Don't leave the active theme pointing at the media dir we just removed. The same TWO-part
 	# check uci-defaults uses: a theme needs its media dir AND its ucode template to render, so
 	# a one-part check could hand the UI to a half-removed bootstrap — the blank page this
@@ -218,4 +214,3 @@ include $(TOPDIR)/feeds/luci/luci.mk
 # Deleting it as a useless comment is exactly what broke the build (both formats, silently).
 # tools/scan-marker.sh re-derives the grep from scan.mk and fails the build if it goes missing.
 # call BuildPackage - OpenWrt buildroot signature
-

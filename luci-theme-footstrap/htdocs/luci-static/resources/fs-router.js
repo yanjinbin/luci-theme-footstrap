@@ -51,6 +51,45 @@ function clearViewIntervals() {
 	_viewIntervals.forEach((id) => { if (id !== keep) window.clearInterval(id); });
 }
 
+/* Status->Overview is a template node whose server template defines three globals and then
+ * instantiates view.status.index. A full load gets those helpers from the template; an SPA arrival
+ * does not, so define them here right before requiring the view. */
+function ensureOverviewHelpers() {
+	/* eslint-disable no-var -- copied from LuCI's admin_status/index.ut to preserve exact
+	   behaviour and keep upstream diffs straightforward. */
+	if (typeof window.progressbar !== 'function')
+		window.progressbar = function(query, value, max, byte) {
+			var pg = document.querySelector(query),
+			    vn = parseInt(value) || 0,
+			    mn = parseInt(max) || 100,
+			    fv = byte ? String.format('%1024.2mB', value) : value,
+			    fm = byte ? String.format('%1024.2mB', max) : max,
+			    pc = Math.floor((100 / mn) * vn);
+			if (pg) {
+				pg.firstElementChild.style.width = pc + '%';
+				pg.setAttribute('title', '%s / %s (%d%%)'.format(fv, fm, pc));
+			}
+		};
+	if (typeof window.renderBox !== 'function')
+		window.renderBox = function(title, active, childs) {
+			childs = childs || [];
+			childs.unshift(window.L.itemlist(E('span'), [].slice.call(arguments, 3)));
+			return E('div', { class: 'ifacebox' }, [
+				E('div', { class: 'ifacebox-head center ' + (active ? 'active' : '') },
+					E('strong', title)),
+				E('div', { class: 'ifacebox-body left' }, childs)
+			]);
+		};
+	if (typeof window.renderBadge !== 'function')
+		window.renderBadge = function(icon, title) {
+			return E('span', { class: 'ifacebadge' }, [
+				E('img', { src: icon, title: title || '' }),
+				window.L.itemlist(E('span'), [].slice.call(arguments, 2))
+			]);
+		};
+	/* eslint-enable no-var */
+}
+
 let _wired = false;
 /* The pathname whose view is CURRENTLY rendered — popstate compares against it to tell a real
  * navigation from a mere fragment change (see there). Seeded from the served page. */
@@ -399,10 +438,11 @@ function navigate(pathname, push, kbd) {
 	 * RPCs for as long as the user stayed. Only on a REVISIT does require() return the cached
 	 * singleton whose __init__ already ran. `_seen` is that distinction, and it must be read BEFORE
 	 * the require resolves, since the require is what fills LuCI's cache. */
-	/* Status→Overview needs the 3 template globals (progressbar/renderBox/renderBadge) an SPA
-	 * arrival never defines — the overview include (05_footstrap_overview_layout.js) defines them
-	 * at its module eval, i.e. inside index.load(), before any include renders. Not here: that
-	 * put ~1.1 KB of overview-only code on every page. */
+	/* Status→Overview needs the 3 template globals (progressbar/renderBox/renderBadge) a SPA
+	 * arrival never defines. They are injected here only for that route, not by a global
+	 * status/include theme hook that leaks across themes. */
+	if (className === 'view.status.index')
+		ensureOverviewHelpers();
 	const RT = window.L;
 	const cached = _seen.has(className);
 	_seen.add(className);

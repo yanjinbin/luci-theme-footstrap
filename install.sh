@@ -2,26 +2,33 @@
 # luci-theme-footstrap + luci-app-footstrap-updater installer for OpenWrt 24.10 (ipk) and 25.12+ (apk).
 #
 # One-line install (run on the router over SSH):
-#   wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+#   wget -qO- https://gh-proxy.com/https://raw.githubusercontent.com/yanjinbin/luci-theme-footstrap/main/install.sh | sh
 # or:
-#   curl -fsSL https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
+#   curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/yanjinbin/luci-theme-footstrap/main/install.sh | sh
 #
-# Optional: pin the THEME release tag ->  ... | sh -s v0.9.3  (the updater always takes its own latest)
+# Optional:
+#   ... | sh -s -- --activate      # install and switch to Footstrap
+#   ... | sh -s -- v0.9.3          # pin the THEME tag (the updater still takes its own latest)
+#   ... | sh -s -- v0.9.3 --activate
 #
 # The installer ASKS whether to install the update checker (luci-app-footstrap-updater). Force the
 # answer without a prompt (scripted installs):  FOOTSTRAP_UPDATER=1 (install) / =0 (theme only).
+# GitHub downloads go through gh-proxy.com by default; override with GITHUB_PROXY=... or disable
+# with GITHUB_PROXY=.
 #
 # SINCE THE SPLIT the theme and the updater ship from TWO repos with their own tags: the theme from
-# VizzleTF/luci-theme-footstrap, the updater from VizzleTF/luci-app-footstrap-updater. This installer
+# yanjinbin/luci-theme-footstrap, the updater from VizzleTF/luci-app-footstrap-updater. This installer
 # resolves each from its own latest release and verifies both against the one release key. The theme
 # is always installed; the updater is OPTIONAL and the installer asks (or FOOTSTRAP_UPDATER=1/0 decides
 # non-interactively). Licensed Apache-2.0.
 
 set -e
 
-REPO_THEME="VizzleTF/luci-theme-footstrap"
+REPO_THEME="yanjinbin/luci-theme-footstrap"
 REPO_UPDATER="VizzleTF/luci-app-footstrap-updater"
-TAG="${1:-latest}"		# pins the THEME tag only; the updater always resolves its own latest
+TAG="latest"		# pins the THEME tag only; the updater always resolves its own latest
+ACTIVATE=0
+GITHUB_PROXY="${GITHUB_PROXY:-https://gh-proxy.com/}"
 
 # mktemp, not a fixed /tmp name: /tmp is 1777, so a local unprivileged process can pre-create a
 # predictable name as a symlink and root writes the downloaded package through it (CWE-377).
@@ -32,6 +39,46 @@ info() { printf '[*] %s\n' "$1"; }
 ok()   { printf '[+] %s\n' "$1"; }
 warn() { printf '[!] %s\n' "$1"; }
 err()  { printf '[-] %s\n' "$1" >&2; }
+
+usage() {
+	cat <<-'EOF'
+	usage: sh install.sh [tag] [--activate]
+
+	  tag         theme release tag to install, default: latest
+	  --activate  switch luci.main.mediaurlbase to /luci-static/footstrap after install
+
+	Environment:
+	  GITHUB_PROXY=https://gh-proxy.com/   prefix used for GitHub/raw/API downloads
+	  FOOTSTRAP_UPDATER=1|0                force installing/skipping the updater package
+	  FOOTSTRAP_ALLOW_UNVERIFIED=1         override missing digest/signature checks
+	EOF
+}
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--activate)
+			ACTIVATE=1
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--*)
+			err "unknown option: $1"
+			usage >&2
+			exit 1
+			;;
+		*)
+			if [ "$TAG" != "latest" ]; then
+				err "unexpected extra argument: $1"
+				usage >&2
+				exit 1
+			fi
+			TAG="$1"
+			;;
+	esac
+	shift
+done
 
 # Decide whether to install the update checker (the luci-app-footstrap-updater package). It is the
 # WHOLE of the "check for new versions / one-click Update" feature — no package, no update controls
@@ -127,6 +174,11 @@ ok "Package manager: $PM (installing .$EXT)"
 #
 fetch() {
 	_u="$1"; _t="$2"; _o="$3"
+	case "$_u" in
+		https://github.com/*|https://api.github.com/*|https://objects.githubusercontent.com/*|https://release-assets.githubusercontent.com/*|https://raw.githubusercontent.com/*)
+			[ -n "$GITHUB_PROXY" ] && _u="${GITHUB_PROXY}${_u}"
+			;;
+	esac
 	if command -v uclient-fetch >/dev/null 2>&1; then
 		if [ -n "$_o" ]; then uclient-fetch -T "$_t" -qO "$_o" "$_u" 2>/dev/null
 		else uclient-fetch -T "$_t" -qO- "$_u" 2>/dev/null; fi
@@ -389,14 +441,29 @@ if [ -x /etc/init.d/rpcd ]; then
 	/etc/init.d/rpcd reload >/dev/null 2>&1 || true
 fi
 
+if [ "$ACTIVATE" = 1 ]; then
+	info "Activating Footstrap..."
+	uci -q set luci.main.mediaurlbase=/luci-static/footstrap
+	uci -q commit luci
+	rm -f /tmp/luci-indexcache* 2>/dev/null || true
+	rm -rf /tmp/luci-modulecache 2>/dev/null || true
+	if [ -x /etc/init.d/uhttpd ]; then
+		/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+	fi
+fi
+
 printf '\n'
 if [ "$UPDATER_INSTALLED" = 1 ]; then
 	ok "luci-theme-footstrap + luci-app-footstrap-updater installed (translations included)."
 else
 	ok "luci-theme-footstrap installed (translations included)."
 fi
-info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
+if [ "$ACTIVATE" = 1 ]; then
+	info "Footstrap is now the active LuCI theme."
+else
+	info "Select \"Footstrap\" in System -> System -> Language and Style -> \"Design\"."
+fi
 info "Layout (sidebar / top bar), dark mode, palette, tint and accent all live in"
 info "the \"Appearance\" popover in the menu. Each browser keeps its own choices;"
-	info "\"Save as default\" stores the current look as the router-wide starting point."
+info "\"Save as default\" stores the current look as the router-wide starting point."
 info "Then hard-reload the page (Ctrl+F5)."

@@ -13,8 +13,7 @@ D="$(cd "$(dirname "$0")" && pwd)"
 "$D"/build-css.sh "$D/htdocs/luci-static/$N/cascade.css" --dev
 
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N \
-	/www/luci-static/$N \
-	/www/luci-static/resources/view/status/include"
+	/www/luci-static/$N"
 
 # the ONE template (+ partials/). Sidebar and top bar are the same markup, morphed by
 # :root[data-layout] — there is no second theme dir to copy.
@@ -29,8 +28,6 @@ scp -qr "$D"/htdocs/luci-static/$N/* "$R":/www/luci-static/$N/
 # individually, so a FIFTH would be shipped by the package (luci.mk copies htdocs/
 # wholesale) yet silently never reach the dev router — first tested after a release.
 scp -q  "$D"/htdocs/luci-static/resources/*.js "$R":/www/luci-static/resources/
-scp -q  "$D"/htdocs/luci-static/resources/view/status/include/*.js \
-	"$R":/www/luci-static/resources/view/status/include/
 
 # stamp the git-derived version into the deployed fs-version.js (the package does the same in
 # Build/Prepare) so the popover shows a real version and the updater's check compares against it. The
