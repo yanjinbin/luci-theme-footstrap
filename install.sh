@@ -8,6 +8,7 @@
 #
 # Optional:
 #   ... | sh -s -- --activate      # install and switch to Footstrap
+#   ... | sh -s -- --upgrade       # upgrade an already installed theme to latest
 #   ... | sh -s -- v0.9.3          # pin the THEME tag (the updater still takes its own latest)
 #   ... | sh -s -- v0.9.3 --activate
 #
@@ -28,6 +29,7 @@ REPO_THEME="${FOOTSTRAP_THEME_REPO:-VizzleTF/luci-theme-footstrap}"
 REPO_UPDATER="${FOOTSTRAP_UPDATER_REPO:-VizzleTF/luci-app-footstrap-updater}"
 TAG="latest"		# pins the THEME tag only; the updater always resolves its own latest
 ACTIVATE=0
+UPGRADE=0
 GITHUB_PROXY="${GITHUB_PROXY:-https://gh-proxy.com/}"
 
 # mktemp, not a fixed /tmp name: /tmp is 1777, so a local unprivileged process can pre-create a
@@ -42,10 +44,11 @@ err()  { printf '[-] %s\n' "$1" >&2; }
 
 usage() {
 	cat <<-'EOF'
-	usage: sh install.sh [tag] [--activate]
+	usage: sh install.sh [tag] [--activate] [--upgrade]
 
 	  tag         theme release tag to install, default: latest
 	  --activate  switch luci.main.mediaurlbase to /luci-static/footstrap after install
+	  --upgrade   when the theme is already installed, upgrade it to latest
 
 	Environment:
 	  GITHUB_PROXY=https://gh-proxy.com/   prefix used for GitHub/raw/API downloads
@@ -60,6 +63,9 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 		--activate)
 			ACTIVATE=1
+			;;
+		--upgrade)
+			UPGRADE=1
 			;;
 		-h|--help)
 			usage
@@ -157,6 +163,24 @@ else
 	exit 1
 fi
 ok "Package manager: $PM (installing .$EXT)"
+
+if [ "$TAG" = "latest" ] && [ "$UPGRADE" = 0 ]; then
+	if { [ "$PM" = "apk" ] && apk info -e luci-theme-footstrap >/dev/null 2>&1; } ||
+	   { [ "$PM" = "opkg" ] && opkg status luci-theme-footstrap >/dev/null 2>&1; }; then
+		ok "luci-theme-footstrap is already installed; leaving its package version unchanged."
+		if [ "$ACTIVATE" = 1 ]; then
+			info "Activating Footstrap..."
+			uci -q set luci.main.mediaurlbase=/luci-static/footstrap
+			uci -q commit luci
+			rm -f /tmp/luci-indexcache* 2>/dev/null || true
+			rm -rf /tmp/luci-modulecache 2>/dev/null || true
+			[ -x /etc/init.d/rpcd ] && /etc/init.d/rpcd reload >/dev/null 2>&1 || true
+		else
+			info "Use --upgrade to install the latest release, or pass an explicit tag."
+		fi
+		exit 0
+	fi
+fi
 
 # --- downloader -----------------------------------------------------------
 # fetch <url> <max-seconds> [outfile]  — stdout when no outfile.
