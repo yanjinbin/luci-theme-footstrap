@@ -297,9 +297,10 @@ function build() {
 
 	/* ---- section 3: the wallpaper and everything that depends on which one is picked ----
 	 *
-	 * Wallpaper is THREE-valued: Off, Pattern (an uploaded SVG, tiled and recoloured) and File (an
-	 * uploaded photo). Each value brings rows with it — the SVG plus Scale/Strength/Colours, or the
-	 * photo plus Dim — and those rows are SIBLINGS of the Wallpaper row, not children of its field.
+	 * Wallpaper offers Off, two package-local presets, Pattern (an uploaded SVG, tiled and
+	 * recoloured) and File (an uploaded photo). Pattern and File bring extra rows with them — the SVG
+	 * plus Scale/Strength/Colours, or the photo plus Dim — and those rows are SIBLINGS of the
+	 * Wallpaper row, not children of its field.
 	 *
 	 * That is the whole point of this shape. They were nested inside the field at first, which put a
 	 * second `.cbi-value` inside a `.cbi-value-field` and therefore a second 180px caption column
@@ -444,6 +445,8 @@ function build() {
 		const wallRow = group(_('Wallpaper', 'footstrap'), (label) => {
 			seg = selectCtl(prefs.currentWallpaper(), {
 				off:     _('Off', 'footstrap'),
+				cats:    _('Cats', 'footstrap'),
+				dinos:   _('Dinosaurs', 'footstrap'),
 				pattern: _('Pattern', 'footstrap'),
 				file:    _('File', 'footstrap')
 			}, setWallpaper, label);

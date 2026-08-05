@@ -91,10 +91,10 @@
 	#}
 	<body class="lang_{{ dispatcher.lang }} {{ entityencode(striptags(node?.title ?? ''), true) }}" data-page="{{ entityencode(join('-', length(ctx.path) ? ctx.path : ctx.request_path), true) }}">
 		{#
-			The wallpaper PATTERN's paint surface, and nothing else: 15-wallpaper.css masks this
-			element so an uploaded SVG takes the theme's ink. A mask applies to an element's whole
-			rendering, children included, so it cannot go on .fs-shell or on <body> — it needs a
-			layer of its own with nothing in it.
+			The tiled wallpaper paint surface, and nothing else: 15-wallpaper.css either gives it a
+			package-local preset or masks it so an uploaded SVG takes the theme's ink. A mask applies
+			to an element's whole rendering, children included, so it cannot go on .fs-shell or on
+			<body> — it needs a layer of its own with nothing in it.
 
 			OUTSIDE the blank_page guard on purpose. The login page renders with blank_page: true
 			(no .fs-shell, no chrome at all), and it is the first page anyone sees: a router whose

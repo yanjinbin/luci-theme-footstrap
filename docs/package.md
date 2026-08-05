@@ -24,9 +24,9 @@ luci-theme-footstrap/
 │   ├── ru/footstrap.po
 │   └── es/footstrap.po
 ├── htdocs/luci-static/   → /www/luci-static/
-│   ├── footstrap/        cascade.css (GENERATED, gitignored), logo.svg
-│   │                     (pattern.svg and fonts/ are NOT here: they are symlinks uci-defaults
-│   │                      makes to /etc/footstrap/, which the admin uploads or installs)
+│   ├── footstrap/        cascade.css (GENERATED, gitignored), logo.svg, wallpapers/{cats,dinos}.svg
+│   │                     (pattern.svg and fonts/ are symlinks uci-defaults makes to
+│   │                      /etc/footstrap/, which the admin uploads or installs)
 │   └── resources/        menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 ├── root/                 → /
 │   ├── etc/uci-defaults/30_luci-theme-footstrap

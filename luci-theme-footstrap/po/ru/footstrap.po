@@ -51,6 +51,11 @@ msgctxt "footstrap"
 msgid "Cards"
 msgstr "Карточки"
 
+#: htdocs/luci-static/resources/fs-appearance.js:448
+msgctxt "footstrap"
+msgid "Cats"
+msgstr "Коты"
+
 #: htdocs/luci-static/resources/fs-appearance.js:342
 msgctxt "footstrap"
 msgid "Choose SVG"
@@ -133,6 +138,11 @@ msgstr "Плотность"
 msgctxt "footstrap"
 msgid "Dim"
 msgstr "Затемнение"
+
+#: htdocs/luci-static/resources/fs-appearance.js:449
+msgctxt "footstrap"
+msgid "Dinosaurs"
+msgstr "Динозавры"
 
 #: htdocs/luci-static/resources/fs-widgets.js:225
 msgctxt "footstrap"
@@ -569,14 +579,6 @@ msgstr "на холсте"
 #~ msgctxt "footstrap"
 #~ msgid "Cancel"
 #~ msgstr "Отмена"
-
-#~ msgctxt "footstrap"
-#~ msgid "Cats"
-#~ msgstr "Коты"
-
-#~ msgctxt "footstrap"
-#~ msgid "Dinosaurs"
-#~ msgstr "Динозавры"
 
 #~ msgctxt "footstrap"
 #~ msgid "Download"

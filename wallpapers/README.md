@@ -1,31 +1,30 @@
 # Pattern wallpapers
 
-Two drawings to try the **Appearance → Background → Wallpaper → Pattern** axis with.
+Two drawings available directly from **Appearance → Background → Wallpaper** as **Cats** and
+**Dinosaurs**.
 
-They are **not part of the theme package** and are not downloaded by it — nothing in footstrap
-reaches the network at run time. Save one and upload it from that page like any other file, or run
-this on the router, as root:
+This fork bundles byte-for-byte copies in the theme package, so selecting either preset performs no
+runtime download. The same files remain available for the custom Pattern uploader and for manual
+installation with this command on the router, as root:
 
 ```sh
 wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/wallpapers/set-pattern.sh | sh -s cats
 ```
 
-`cats` or `dinos`, and the cats are back where they used to be. Details below.
+Use `cats` or `dinos`. Details below.
 
 | file | size | tile |
 |---|---|---|
 | `svg/cats.svg` | 77 kB | 870 units square, reads well around 440 px |
 | `svg/dinos.svg` | 128 kB | 2048 units square, reads well around 880 px |
 
-The copies at `cats.svg` and `dinos.svg` keep the original raw GitHub URLs working for older
-installations and bookmarks. The files in `svg/` are canonical; compatibility copies must remain
-byte-for-byte identical.
+The files in `svg/` are canonical. Copies at `cats.svg` and `dinos.svg` keep the original raw
+GitHub URLs working, while copies under
+`luci-theme-footstrap/htdocs/luci-static/footstrap/wallpapers/` are the packaged Background
+presets. All copies must remain byte-for-byte identical.
 
-Earlier versions of the theme fetched these two from this repository on demand and checked them
-against a pinned sha256. That is gone: a theme in a package feed has no business calling a
-third-party host while a settings page is open, and *your* drawing is the interesting half of the
-feature anyway. They stay here because they are pleasant and because they are exactly the shape a
-pattern wants to be.
+Earlier versions fetched these two from GitHub on demand. The packaged presets replace that path:
+the images are already on the router, and the theme makes no network request when they are selected.
 
 ## Putting one back on a router without a browser
 

@@ -22,9 +22,7 @@ scp -q  "$D"/ucode/template/themes/$N/*.ut      "$R":/usr/share/ucode/luci/templ
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N/partials"
 scp -q  "$D"/ucode/template/themes/$N/partials/*.ut "$R":/usr/share/ucode/luci/template/themes/$N/partials/
 
-# shared static (cascade.css, fonts, logo). The doodle wallpapers are NOT here and not in the
-# package: they are downloaded on demand from GitHub (fs-prefs.js installWallpaper), so the dev
-# router deliberately starts without them — that is the state to test the download dialog in.
+# shared static (cascade.css, fonts, logo and the two package-local wallpaper presets).
 scp -qr "$D"/htdocs/luci-static/$N/* "$R":/www/luci-static/$N/
 
 # EVERY resource JS, by GLOB — never by name. This used to list the four files

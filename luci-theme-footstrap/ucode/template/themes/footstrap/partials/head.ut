@@ -17,7 +17,7 @@
 	let _sd_lay  = index([ 'sidebar', 'top' ], fs_defaults.layout) >= 0 ? fs_defaults.layout : '';
 	let _sd_dark = index([ 'auto', 'light', 'dark' ], fs_defaults.darkmode) >= 0 ? fs_defaults.darkmode : '';
 	let _sd_pal  = index([ 'footstrap', 'hicontrast', 'bootstrap' ], fs_defaults.palette) >= 0 ? fs_defaults.palette : '';
-	let _sd_wall = index([ 'off', 'pattern', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
+	let _sd_wall = index([ 'off', 'cats', 'dinos', 'pattern', 'file' ], fs_defaults.wallpaper) >= 0 ? fs_defaults.wallpaper : '';
 	let _sd_pink = index([ 'theme', 'original' ], fs_defaults.pattern_ink) >= 0 ? fs_defaults.pattern_ink : '';
 	let _sd_ac   = index([ 'on', 'off' ], fs_defaults.autocollapse) >= 0 ? fs_defaults.autocollapse : '';
 	let _sd_dens = index([ 'compact', 'normal', 'large' ], fs_defaults.density) >= 0 ? fs_defaults.density : '';
@@ -221,11 +221,8 @@
 					/* legacy 'rvht'/'roman' = default colours + a doodle wallpaper, and legacy
 					   'github' = the footstrap default, now stored explicitly. Migrate to the current
 					   explicit value, do NOT clear (an absent key means "inherit the router default",
-					   which is no longer the same as "the built-in default"). The doodles they used to
-					   turn on are gone — the Wallpaper axis now paints an SVG the admin uploads — so
-					   the wallpaper half of that migration has nothing to point at and is dropped;
-					   `fs-wallpaper` keeps whatever it holds and the whitelist below reads a doodle
-					   name as off. */
+					   which is no longer the same as "the built-in default"). The wallpaper axis is
+					   independent, so `fs-wallpaper` keeps whatever it holds. */
 					if (p === 'rvht' || p === 'roman' || p === 'github') {
 						localStorage.setItem('fs-palette', 'footstrap'); p = 'footstrap';
 					}
@@ -237,8 +234,8 @@
 					if (p === 'hicontrast' || p === 'bootstrap') root.setAttribute('data-palette', p);
 					else root.removeAttribute('data-palette');
 
-					/* Wallpaper: off | pattern (the uploaded SVG, tiled and recoloured) | file (the
-					   uploaded photo). The url() and the two pattern numbers are set BEFORE the
+					/* Wallpaper: off | cats/dinos (package-local presets) | pattern (the uploaded SVG,
+					   tiled and recoloured) | file (the uploaded photo). The url() and the two pattern numbers are set BEFORE the
 					   attribute for the reason every axis here is: the other order paints one frame
 					   with the tile at the previous size. sd.pattern is the cache-bust token, already
 					   whitelisted to hex above, so nothing user-controlled reaches the url(). */
@@ -257,7 +254,7 @@
 
 					let w = localStorage.getItem('fs-wallpaper');
 					if (w === null) w = sd.wallpaper || null;
-					if (w === 'pattern' || w === 'file') root.setAttribute('data-wallpaper', w);
+					if (w === 'cats' || w === 'dinos' || w === 'pattern' || w === 'file') root.setAttribute('data-wallpaper', w);
 					else root.removeAttribute('data-wallpaper');
 
 					/* Density: Compact/Normal/Large, a pure token axis (02-tokens multiplies the

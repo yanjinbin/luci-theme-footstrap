@@ -117,10 +117,8 @@ if [ -d /www/luci-static/footstrap ]; then
 		rm -rf /www/luci-static/footstrap/fonts
 	ln -sfn /etc/footstrap/fonts /www/luci-static/footstrap/fonts 2>/dev/null
 fi
-# The two doodle wallpapers earlier versions downloaded into /www on demand. They were never
-# package files, so no package manager will ever remove them, and nothing serves them any more —
-# the axis they belonged to now paints an admin-uploaded SVG. Left behind they are 200 kB of a
-# router's flash held by a feature that no longer exists.
+# Remove legacy on-demand copies from the old flat paths. Current releases ship the same presets
+# below /www/luci-static/footstrap/wallpapers/, where the package manager owns their lifecycle.
 rm -f /www/luci-static/footstrap/cats.svg /www/luci-static/footstrap/dinos.svg 2>/dev/null
 
 # these caches embed theme paths — drop them so the switch applies on the next request

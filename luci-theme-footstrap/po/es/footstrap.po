@@ -55,6 +55,11 @@ msgctxt "footstrap"
 msgid "Cards"
 msgstr "Tarjetas"
 
+#: htdocs/luci-static/resources/fs-appearance.js:448
+msgctxt "footstrap"
+msgid "Cats"
+msgstr "Gatos"
+
 #: htdocs/luci-static/resources/fs-appearance.js:342
 msgctxt "footstrap"
 msgid "Choose SVG"
@@ -139,6 +144,11 @@ msgstr "Densidad"
 msgctxt "footstrap"
 msgid "Dim"
 msgstr "Oscurecimiento"
+
+#: htdocs/luci-static/resources/fs-appearance.js:449
+msgctxt "footstrap"
+msgid "Dinosaurs"
+msgstr "Dinosaurios"
 
 #: htdocs/luci-static/resources/fs-widgets.js:225
 msgctxt "footstrap"
@@ -576,14 +586,6 @@ msgstr "en el lienzo"
 #~ msgctxt "footstrap"
 #~ msgid "Cancel"
 #~ msgstr "Cancelar"
-
-#~ msgctxt "footstrap"
-#~ msgid "Cats"
-#~ msgstr "Gatos"
-
-#~ msgctxt "footstrap"
-#~ msgid "Dinosaurs"
-#~ msgstr "Dinosaurios"
 
 #~ msgctxt "footstrap"
 #~ msgid "Download"

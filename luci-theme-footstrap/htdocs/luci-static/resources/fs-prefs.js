@@ -362,21 +362,20 @@ function applyPalette(val) {
 }
 
 /* Wallpaper is a MULTI-value axis and its own concern (composes with either palette): off (bare
- * canvas), pattern (the admin-uploaded SVG, tiled and recoloured — 15-wallpaper.css) or file (the
- * admin-uploaded photo, 16-login-bg.css). It is not the enumAxis shape (that is two-valued) —
- * data-wallpaper carries the VALUE or is absent for 'off'. BOTH images are router-side
- * (currentPattern / currentLoginBg below); this axis only decides whether THIS browser paints one,
- * so a router-wide backdrop comes from Save-as-default, including the pre-login page.
+ * canvas), cats/dinos (the two package-local presets), pattern (the admin-uploaded SVG, tiled and
+ * recoloured — 15-wallpaper.css) or file (the admin-uploaded photo, 16-login-bg.css). It is not the
+ * enumAxis shape (that is two-valued) — data-wallpaper carries the VALUE or is absent for 'off'.
+ * This axis only decides whether THIS browser paints one, so a router-wide backdrop comes from
+ * Save-as-default, including the pre-login page.
  *
  * The list is what VALIDATES a stored value, so a value added to the CSS and not to this array is
  * one head.ut pre-paints and the live applier then rejects: the page would paint it and the first
  * touch of any other control would take it away. Adding one means this line, the head.ut whitelist,
  * the segmented control in fs-appearance.js and the rules in 15-wallpaper.css.
  *
- * A router upgrading from a version with the downloaded `cats`/`dinos` doodles reads its stored
- * value here, finds it is not in the list, and falls to 'off' — the files those named are not in
- * the package and are no longer fetched, so painting them was never an option. */
-const WALLPAPERS = [ 'pattern', 'file' ];		/* the non-off values; 'off' = bare :root */
+ * Cats and dinos are shipped in the package: selecting either is entirely local and never performs
+ * a runtime download. */
+const WALLPAPERS = [ 'cats', 'dinos', 'pattern', 'file' ];	/* non-off values; 'off' = bare :root */
 function wallpaperDefault() {
 	const d = sd('wallpaper');
 	return (WALLPAPERS.indexOf(d) >= 0) ? d : 'off';

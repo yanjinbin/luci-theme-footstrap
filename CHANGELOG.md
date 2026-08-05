@@ -13,6 +13,10 @@ Every commit writes into `[Unreleased]`. Cutting a tag renames that heading.
 
 ## [Unreleased]
 
+### Added
+
+- **Cats and Dinosaurs are package-local Background presets again.** Both SVGs ship under the theme's static directory and appear beside Off, Pattern and File in Appearance. Selecting either is entirely local: no settings-page download, no third-party runtime dependency, and the existing uploaded Pattern path remains unchanged.
+
 ### Changed
 
 - **`npm run axes` now holds the uci field name each axis reads, which is the hole `pattern_ink` went through.** The factories reach the router default through `window.__fsSD`, and they name the field two ways: `enumAxis`/`colorAxis` derive it from the localStorage key, `propAxis`/`surfaceAxis` are handed it. Nothing checked either against the template that emits those fields, so `fs-pattern-ink` asking for `pattern-ink` while head.ut prints `pattern_ink` was invisible to every gate — the axis then reports the built-in default however the router is configured, and Save-as-default writes that built-in over the admin's stored value, all silently. The gate now runs the deriving factories' **own** formula, lifted out of `fs-prefs.js` and compiled, rather than restating it: written the obvious way it would hold head.ut against itself and stay green while the JS said something else, which was measured — a version with the hyphen fold reverted to a bare `slice(3)` passed the restated check and fails the derived one. `surfaceAxis` joined the key scan in the same pass, so the four surface axes are covered by the css-orphans check they had been missing (21 keys → 25). Found in review on openwrt/luci#8903.

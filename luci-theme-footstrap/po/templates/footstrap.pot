@@ -45,6 +45,11 @@ msgctxt "footstrap"
 msgid "Cards"
 msgstr ""
 
+#: htdocs/luci-static/resources/fs-appearance.js:448
+msgctxt "footstrap"
+msgid "Cats"
+msgstr ""
+
 #: htdocs/luci-static/resources/fs-appearance.js:342
 msgctxt "footstrap"
 msgid "Choose SVG"
@@ -126,6 +131,11 @@ msgstr ""
 #: htdocs/luci-static/resources/fs-appearance.js:318
 msgctxt "footstrap"
 msgid "Dim"
+msgstr ""
+
+#: htdocs/luci-static/resources/fs-appearance.js:449
+msgctxt "footstrap"
+msgid "Dinosaurs"
 msgstr ""
 
 #: htdocs/luci-static/resources/fs-widgets.js:225

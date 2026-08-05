@@ -178,7 +178,8 @@ remaining path. Details: [package.md](package.md).
 ```
 /usr/share/ucode/luci/template/themes/footstrap/
         header.ut, footer.ut, sysauth.ut, partials/*.ut
-/www/luci-static/footstrap/            cascade.css (generated), fonts/, logo.svg
+/www/luci-static/footstrap/            cascade.css (generated), fonts/, logo.svg,
+                                       wallpapers/{cats,dinos}.svg
                                        (+ pattern.svg — a symlink to /etc/footstrap, uploaded)
 /www/luci-static/resources/            menu-footstrap.js, menu-footstrap-common.js, fs-*.js
 /usr/lib/lua/luci/i18n/footstrap-theme.<lang>.lmo    catalogue, bundled INSIDE the theme package

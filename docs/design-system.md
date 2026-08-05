@@ -194,7 +194,7 @@ The values live in `fs-prefs.js`. In the order it draws them:
 | **Theme** | auto / light / dark | `fs-darkmode` | `data-darkmode` + `data-theme` + `data-bs-theme` |
 | **Palette** | footstrap / hicontrast | `fs-palette` | `data-palette` |
 | **Density** | compact / normal / large | `fs-density` | `data-density` |
-| **Wallpaper** | off / pattern / **file** | `fs-wallpaper` | `data-wallpaper` — `pattern` tiles an admin-uploaded SVG through a CSS mask; Scale, Strength and Colours are axes of their own |
+| **Wallpaper** | off / cats / dinos / pattern / **file** | `fs-wallpaper` | `data-wallpaper` — `cats` and `dinos` are package-local presets; `pattern` tiles an admin-uploaded SVG through a CSS mask; Scale, Strength and Colours are axes of their own |
 | **Tint** | off, hue 1–360°, `#rrggbb` | `fs-tint` | `data-tint=hue\|hex`, `--fs-tint-h` / `--fs-bg` |
 | **Tint strength** | 0–200%, default 100 | `fs-tint-strength` | `--fs-tint-strength` |
 | **Accent** | off, hue 1–360°, `#rrggbb` | `fs-accent` | `data-accent=hue\|hex`, `--fs-accent-h` / `--fs-accent` |

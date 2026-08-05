@@ -1,8 +1,8 @@
 @layer theme {
-	/* Wallpaper axis, value `pattern`: an SVG the ADMIN uploads, tiled behind the content and
-	 * recoloured by the theme. It composes with any palette, and the recolour is what makes that
-	 * true — the drawing takes --fs-text, so the same file reads correctly in light and in dark
-	 * without the admin editing it.
+	/* Wallpaper axis: `cats` and `dinos` are package-local SVG presets; `pattern` is an SVG the ADMIN
+	 * uploads, tiled behind the content and recoloured by the theme. The uploaded pattern composes
+	 * with any palette because the drawing takes --fs-text, so the same file reads correctly in
+	 * light and in dark without the admin editing it.
 	 *
 	 * WHY A DEDICATED ELEMENT AND NOT A `background-image`. Recolouring an image the browser has
 	 * already rasterised takes `mask-image`: the SVG supplies the ALPHA and the element supplies the
@@ -22,21 +22,40 @@
 	 * Cards sit on opaque --fs-panel and cover it, so the pattern shows through the gaps only. */
 	.fs-pattern { display: none; }
 
-	:root[data-wallpaper="pattern"] { background-color: var(--fs-bg); }
-	:root[data-wallpaper="pattern"] body,
-	:root[data-wallpaper="pattern"] .fs-main { background-color: transparent; }
-	:root[data-wallpaper="pattern"] footer.fs-footer { background: transparent; }
+	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"], [data-wallpaper="pattern"]) { background-color: var(--fs-bg); }
+	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"], [data-wallpaper="pattern"]) body,
+	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"], [data-wallpaper="pattern"]) .fs-main { background-color: transparent; }
+	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"], [data-wallpaper="pattern"]) footer.fs-footer { background: transparent; }
 
 	/* `fixed`, so the pattern is one calm backdrop the page scrolls under rather than a strip that
 	 * slides with every table — the same argument the File photo's background-attachment makes.
 	 * --fs-pattern-url is `none` until something is uploaded (head.ut / fs-prefs.js), so the axis
 	 * selected with no file is a bare canvas rather than a broken tile. */
-	:root[data-wallpaper="pattern"] .fs-pattern {
+	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"], [data-wallpaper="pattern"]) .fs-pattern {
 		display: block;
 		position: fixed;
 		inset: 0;
 		z-index: -1;
 		pointer-events: none;
+	}
+
+	/* The preset files already carry 20% opacity in their SVG group. Keep the layer itself opaque so
+	 * their intended strength is not multiplied by the uploaded-pattern strength axis. */
+	:root[data-wallpaper="cats"] .fs-pattern,
+	:root[data-wallpaper="dinos"] .fs-pattern {
+		background-repeat: repeat;
+		opacity: 1;
+	}
+	:root[data-wallpaper="cats"] .fs-pattern {
+		background-image: url("/luci-static/footstrap/wallpapers/cats.svg");
+		background-size: 440px auto;
+	}
+	:root[data-wallpaper="dinos"] .fs-pattern {
+		background-image: url("/luci-static/footstrap/wallpapers/dinos.svg");
+		background-size: 880px auto;
+	}
+
+	:root[data-wallpaper="pattern"] .fs-pattern {
 		opacity: var(--fs-pattern-strength);
 	}
 	/* THEME INK (the default). The file's own colours are discarded and only its alpha is used, so
@@ -67,7 +86,7 @@
 	/* var(--fs-blur), not a literal: one radius for every frosted surface (02-tokens.css), and
 	 * the literal 6px was also invisible to prefers-reduced-transparency, which nulls the token
 	 * (95-a11y-media.css) — the one frost that kept blurring for users who asked for opaque. */
-	:root[data-wallpaper="pattern"] .cbi-dropdown:not([open]) {
+	:root:is([data-wallpaper="cats"], [data-wallpaper="dinos"], [data-wallpaper="pattern"]) .cbi-dropdown:not([open]) {
 		backdrop-filter: var(--fs-blur);
 		-webkit-backdrop-filter: var(--fs-blur);
 	}
