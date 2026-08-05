@@ -7,14 +7,20 @@
 'require menu-footstrap-common as common';
 
 /* The theme's ONE menu renderer: a vertical #topmenu the CSS also turns into the top bar and the
- * rail flyouts — same markup, no second renderer (CLAUDE.md). The disclosure primitives it builds
+ * rail flyouts — same markup, no second renderer (docs/chrome.md). The disclosure primitives it builds
  * sections on come from fs-widgets and the auto-collapse preference from fs-prefs; the rest of the
  * chrome (mode menu, tabs, rail, router, popover) is bootstrapped by menu-footstrap-common, which
  * this file composes with by injecting renderMainMenu into common.init — a callback, not an
- * override, because a required LuCI module is a singleton and cannot be subclassed (docs/11).
- * Spec: docs/09-sidebar-implementation.md */
+ * override, because a required LuCI module is a singleton and cannot be subclassed (docs/conventions.md).
+ * Spec: docs/chrome.md */
 
-const ICONS = {
+/* A NULL PROTOTYPE, because `ICONS[key]` is a lookup by a MENU NODE NAME — a string a third-party
+ * package chooses in its menu.d, not one this theme knows. A plain object literal answers
+ * `constructor` and `__proto__` out of Object.prototype, so a node with either name resolved to a
+ * truthy non-string, skipped the `|| ICONS._default` fallback, and iconSvg() concatenated it into
+ * link.innerHTML below — `function Object() { [native code] }` and `[object Object]` respectively
+ * (measured). The dotted reads (ICONS.vpn, ICONS._default) are unaffected. */
+const ICONS = Object.assign(Object.create(null), {
 	status:   '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
 	system:   '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
 	services: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6"/>',
@@ -22,7 +28,7 @@ const ICONS = {
 	vpn:      '<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
 	docker:   '<rect x="3" y="11" width="4" height="4" rx=".7"/><rect x="8" y="11" width="4" height="4" rx=".7"/><rect x="13" y="11" width="4" height="4" rx=".7"/><rect x="8" y="6" width="4" height="4" rx=".7"/><path d="M18 13c0 4-3 6-8 6-4 0-7-2-7-4"/>',
 	_default: '<circle cx="12" cy="12" r="8.5"/>'
-};
+});
 
 function iconSvg(name) {
 	const key = String(name || '').toLowerCase();
@@ -56,17 +62,25 @@ function flyoutMode() {
 const TRIGGER = ':scope > a';
 const OPEN_LI = '#topmenu > li.open';
 
-/* ---- dropdown edge-clamp (top bar, every width) --------------------------
- * In the top layout each panel hangs off its OWN item (li position:relative, ul left:0 —
- * theme/50-toplayout.css), so an item near the right edge would push its panel past the viewport.
- * Nudge it back inside. Runs at ANY width now that the top bar is measured (no 768 floor); the
- * rail flies panels out sideways and the SIDEBAR layout's phone bar pins+caps its own, so neither
- * needs this. */
+/* ---- dropdown edge-clamp (the BAR, every width and every bar state) ------
+ * A bar panel hangs off its OWN item (li position:relative, ul left:0 — theme/20-shell.css), so an
+ * item near the right edge would push its panel past the viewport. Nudge it back inside. Runs at
+ * ANY width now that the top bar is measured (no 768 floor); the rail flies panels out sideways
+ * and needs a different placement, so it is excluded below. */
 /* the viewport edge gap, defined once in fs-widgets.js — the Appearance popover keeps a popup off
  * the edge by the same amount, and the two used to state it separately */
 const EDGE_GAP = widgets.EDGE_GAP;
+/* Is this panel a BAR dropdown (anchored under its item) rather than a rail flyout (anchored
+ * beside it)? Ask what the STYLESHEET asks, exactly as flyoutMode() does: `data-narrow` is what
+ * turns the sidebar layout into a bar, and it also disables the rail (the rail's rules are all
+ * scoped `:not([data-narrow])`), so a narrow window is a bar even with the rail on. Gating this on
+ * isTopLayout() alone was issue #19's second half: the panel was anchored per item by the CSS but
+ * the clamp declined to place it, so an item near the right edge overflowed the viewport. */
+function barDropdown() {
+	return prefs.isTopLayout() || document.documentElement.hasAttribute('data-narrow');
+}
 function clampDropdown(li) {
-	if (!prefs.isTopLayout()) return;
+	if (!barDropdown()) return;
 	const menu = li.querySelector(':scope > ul');
 	if (!menu) return;
 
@@ -204,7 +218,16 @@ function renderMainMenu(tree, url, level) {
 			/* W3C APG disclosure-navigation: a section header is a BUTTON owning a panel, not
 			 * a link to "#". Not role="menu" — APG is explicit that site navigation must not
 			 * take on the menubar pattern's arrow-key semantics. */
-			const subId = 'fs-sub-' + String(child.name).replace(/[^a-z0-9]+/gi, '-') + '-' + idx;
+			/* THE ID MUST BE INJECTIVE, because a menu node name is a string a third-party
+			 * package picks in its own menu.d and two of them may differ only in punctuation.
+			 * `[^a-z0-9]+` -> '-' folded `foo.bar` and `foo-bar` onto ONE id, so two sections at
+			 * the same level emitted the same `id` and both triggers' aria-controls resolved to
+			 * whichever panel stands first in the document — a screen reader is then told the
+			 * closed section owns the open one's contents. Escaping to the code point keeps the
+			 * id readable for the ordinary all-alphanumeric case and cannot collide. */
+			const subId = 'fs-sub-' +
+				String(child.name).replace(/[^a-z0-9]/gi, (c) => '_' + c.charCodeAt(0).toString(16)) +
+				'-' + idx;
 			submenu.id = subId;
 			link.setAttribute('role', 'button');
 			link.setAttribute('aria-controls', subId);

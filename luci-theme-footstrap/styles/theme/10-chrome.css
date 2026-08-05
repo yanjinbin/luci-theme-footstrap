@@ -79,8 +79,9 @@
 	.fs-logo-ring { fill: #002b49; }
 	:root[data-darkmode="true"] .fs-logo-ring { fill: #e6f4fb; }
 
-	/* 700, not 800: no 800 face is shipped (it drew six elements for 18 KB — 01-fonts.css),
-	 * so 800 silently resolved to 700 anyway. Say so. */
+	/* 700, not 800: the theme ships no faces, so 800 is whatever the reader's Manrope or system
+	 * stack has — 700 for most of them, synthesised for the rest. It already resolved to 700 back
+	 * when the 18 KB face was bundled and dropped for drawing six elements. Say so. */
 	.fs-wordmark { font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); letter-spacing: -.01em; }
 
 	/* Skip link — the first tab stop: a keyboard/SR user jumps the whole menu instead of
@@ -88,7 +89,7 @@
 	 * display:none / visibility:hidden — that removes it from the tab order, which is the
 	 * one thing it exists for. Sits above everything, incl. an open popover. */
 	.fs-skip {
-		position: fixed; top: 8px; left: 8px; z-index: var(--fs-z-dropdown);
+		position: fixed; top: 8px; inset-inline-start: 8px; z-index: var(--fs-z-dropdown);
 		padding: var(--fs-space-2-5) var(--fs-space-4); border-radius: var(--fs-radius);
 		background: var(--fs-accent); color: var(--fs-on-accent);
 		font-weight: var(--fs-weight-bold); font-size: var(--fs-type); text-decoration: none;
@@ -179,17 +180,19 @@
 		background: var(--fs-accent-soft); color: var(--fs-accent);
 	}
 
-	/* Keyboard focus for the chrome controls — the same ring every form field gets. Covers
-	 * the buttons/links the theme itself renders, which had only the UA default (menu
-	 * links: base's thin dotted outline). */
+	/* Keyboard focus for the chrome controls. Covers the buttons/links the theme itself renders,
+	 * which had only the UA default (menu links: base's thin dotted outline).
+	 *
+	 * --fs-focus-ring-solo, not --fs-focus-ring: none of these flips a border on focus, so the
+	 * ring is the entire indicator, and the tinted ring measures 1.15-1.29:1 against the sidebar
+	 * — i.e. tabbing through the WHOLE MENU showed nothing at 3:1. See the two-ring contract in
+	 * 02-tokens.css: the tint is only legitimate beside a second channel. */
 	.fs-railtoggle:focus-visible,
 	.fs-themerow:focus-visible,
 	.fs-logout:focus-visible,
-	.fs-seg button:focus-visible,
-	.fs-ap-update:focus-visible,
 	.fs-sidebar ul.nav a:focus-visible {
 		outline: none;
-		box-shadow: var(--fs-focus-ring);
+		box-shadow: var(--fs-focus-ring-solo);
 	}
 
 	/* The page-wide accent signals no widget rule covers. All three follow the palette:

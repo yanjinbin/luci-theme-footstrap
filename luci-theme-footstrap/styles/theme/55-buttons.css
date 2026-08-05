@@ -49,7 +49,11 @@
 		box-shadow: var(--fs-focus-ring);
 	}
 	/* Solid variants sit ON --fs-accent/--fs-good/--fs-danger, so an accent-tinted ring is
-	 * invisible against them: ring in the surface colour with an accent halo. */
+	 * invisible against them: ring in the surface colour with an accent halo. That halo was
+	 * written out here as a literal ending in --fs-accent-soft — a 10-15% tint, i.e. 1.15-1.29:1
+	 * against the surface, so the only thing this rule really painted was the 2px gap. It is
+	 * --fs-focus-ring-solo now: same geometry, solid accent, and one name for the four rules that
+	 * had been spelling it out. */
 	.cbi-button-positive:focus-visible, .cbi-button-action:focus-visible,
 	.cbi-button-negative:focus-visible, .cbi-button-remove:focus-visible,
 	.cbi-button-apply:focus-visible, .cbi-button-save:focus-visible,
@@ -57,7 +61,7 @@
 	.btn.error:focus-visible, .btn.success:focus-visible, .btn.info:focus-visible {
 		outline: none;
 		border-color: transparent;
-		box-shadow: 0 0 0 2px var(--fs-panel), 0 0 0 5px var(--fs-accent-soft);
+		box-shadow: var(--fs-focus-ring-solo);
 	}
 
 	/* Pressed state. The `box-shadow: none` above would erase any press cue, so the inset shadow
@@ -120,7 +124,7 @@
 		box-shadow: none;
 		padding: var(--fs-space-2) 0;
 		margin: 0 0 var(--fs-card-gap);
-		text-align: right;
+		text-align: end;
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
@@ -152,29 +156,15 @@
 		border-color: var(--fs-danger-line-hi);
 	}
 
-	/* Room for the spinning glyph base draws with a ::before. This is the padding of whatever is
-	 * spinning, so it has to out-rank that thing's OWN padding — the theme's `.cbi-button` (0,1,0),
-	 * and, on the Save & Apply split control, the dropdown box's `padding: 0` (up to 0,3,0). Hence
-	 * the ladder: every member is one class more specific than the rule it must beat. base used to
-	 * do this with an !important, which inverts the layer order and is the thing this codebase does
-	 * not want in `base`. */
-	.spinning, .cbi-button.spinning, .btn.spinning,
-	.cbi-dropdown.btn.spinning, .cbi-dropdown.cbi-button.spinning,
-	.cbi-dropdown:not(.btn):not(.cbi-button).spinning,
-	/* …and the row-action rule below, which is (0,2,0) like `.cbi-button.spinning` and written
-	 * AFTER it, so it was winning on source order alone — the shape this project forbids, and the
-	 * symptom was the spinner drawn ON TOP of the label: Network → Interfaces, "Restart" during
-	 * "Interface is reconnecting…" came out at 12px of left padding where the glyph needs 28
-	 * (issue #15). One class more specific than the rule it must beat, exactly as above. */
-	.td .cbi-button.spinning, .td .btn.spinning,
-	.cbi-section-actions .cbi-button.spinning, .cbi-section-actions .btn.spinning,
-	.cbi-section-table .cbi-button.spinning {
-		/* clear the glyph base/95-luci.css draws: its inset + its box + a gap. Was a bare 32px. */
-		padding-left: calc(var(--fs-space-2) + var(--fs-spin-size) + var(--fs-space-1));
-	}
+	/* THERE IS NO `.spinning` PADDING LADDER HERE ANY MORE, and it must not come back. It used to
+	 * be seven selectors reserving room for the absolutely-positioned glyph base draws — each one
+	 * climbing a class above whatever else padded that element. The ladder lost twice in the field
+	 * (issues #15 and #22, the second to a 0,5,0 data-table rule), and every loss looks the same:
+	 * the spinner draws on top of the label, silently. base/95-luci.css puts the glyph IN THE FLOW
+	 * instead, so it reserves its own space and no host padding is involved. */
 
 	input[type="file"]::file-selector-button {
-		margin-right: var(--fs-space-3); padding: var(--fs-space-2) var(--fs-space-3-5);
+		margin-inline-end: var(--fs-space-3); padding: var(--fs-space-2) var(--fs-space-3-5);
 		font-family: var(--fs-font-sans); font-size: var(--fs-type); font-weight: var(--fs-weight);
 		color: var(--fs-text); background: var(--fs-panel2);
 		border: 1px solid var(--fs-border); border-radius: var(--fs-radius-sm); cursor: pointer;
@@ -207,9 +197,14 @@
 	.cbi-section-actions .cbi-button-edit, .cbi-section-actions .cbi-button-action {
 		color: var(--fs-accent); border-color: var(--fs-accent-line); background: transparent;
 	}
+	/* THE HOVER INK IS --fs-text, NOT THE ROLE COLOUR, and that is the rule this file already
+	 * states twice with measurements: text of colour C on a translucent tint of C eats its own
+	 * contrast (Save: accent on accent-soft = 4.25:1, an AA failure; the alert `.label` chip: 3.4-4.4
+	 * across the palettes). The row actions were the last place it survived — the role still reads,
+	 * from the fill and the border, which is exactly how Save and Reset carry theirs. */
 	.td .cbi-button-action:hover, .td .cbi-button-edit:hover, .td .cbi-button-apply:hover,
 	.cbi-section-actions .cbi-button-action:hover {
-		background: var(--fs-accent-soft); color: var(--fs-accent);
+		background: var(--fs-accent-soft); color: var(--fs-text);
 		border-color: var(--fs-accent-line-hi);
 	}
 	/* An enabled/positive toggle in a table cell (System -> Startup) rendered as blue text on a
@@ -217,8 +212,12 @@
 	.td .cbi-button-positive, .cbi-section-actions .cbi-button-positive {
 		color: var(--fs-good); border-color: var(--fs-good-line); background: transparent;
 	}
+	/* …and the border-colour the other two variants already had. Without it the green outline stayed
+	 * at -line while action and negative brightened to -line-hi, so hovering the positive toggle
+	 * read as less responsive than its neighbours in the same row. */
 	.td .cbi-button-positive:hover, .cbi-section-actions .cbi-button-positive:hover {
-		background: var(--fs-good-soft);
+		background: var(--fs-good-soft); color: var(--fs-text);
+		border-color: var(--fs-good-line-hi);
 	}
 	.td .cbi-button-negative, .td .cbi-button-remove,
 	.cbi-section-actions .cbi-button-remove, .cbi-section-actions .cbi-button-negative {
@@ -226,7 +225,7 @@
 	}
 	.td .cbi-button-negative:hover, .td .cbi-button-remove:hover,
 	.cbi-section-actions .cbi-button-negative:hover {
-		background: var(--fs-danger-soft); color: var(--fs-danger);
+		background: var(--fs-danger-soft); color: var(--fs-text);
 		border-color: var(--fs-danger-line-hi);
 	}
 
@@ -247,7 +246,7 @@
 	 * hover: one step UP the same ladder.
 	 *
 	 * THE LABEL IS --fs-text, NOT --fs-accent: never put text of colour C on a translucent tint
-	 * of C (CLAUDE.md). The tint drags the surface toward the text and eats its own contrast —
+	 * of C (docs/design-system.md). The tint drags the surface toward the text and eats its own contrast —
 	 * accent-on-accent-soft measured 4.25:1, an AA failure axe caught the moment the tint went
 	 * in. The role is carried by the fill and the border; the label only has to be legible.
 	 *
@@ -272,9 +271,11 @@
 	/* Buttons that are part of a compound field widget. */
 	.cbi-dynlist > .add-item > button,
 	.cbi-dynlist > .add-item > .cbi-button-add {
-		flex: 0 0 auto; width: auto; min-width: 38px;
+		/* min-width was a bare 38px — the same number --fs-ctl-h already states. A restated value
+		 * is the drift this ladder exists to prevent, and it also sat out the Density axis. */
+		flex: 0 0 auto; width: auto; min-width: var(--fs-ctl-h);
 		min-height: var(--fs-ctl-h-sm); padding: 0 var(--fs-space-3); margin: 0;
-		border: 0; border-left: 1px solid var(--fs-border);
+		border: 0; border-inline-start: 1px solid var(--fs-border);
 		border-radius: 0;
 		background: transparent; color: var(--fs-dim);
 	}
@@ -284,11 +285,16 @@
 		border: 0; border-radius: 0; margin: 0;
 		background: transparent; color: var(--fs-dim);
 		padding: 0 var(--fs-space-3); min-height: var(--fs-ctl-h);
-		border-left: 1px solid var(--fs-border);
+		border-inline-start: 1px solid var(--fs-border);
 	}
 	.control-group:has(> .cbi-input-password) > button.cbi-button-neutral:hover { color: var(--fs-accent); }
+	/* SQUARE, ON THE LADDER: these were the only buttons in the theme set in bare pixels
+	 * (40 wide x 34 high), and 34 was the one control height that appears in no scale — the ladder
+	 * is --fs-ctl-h-sm/-h/-h-lg = 30/38/44, plus the derived FIELD height (--fs-control-h, 32).
+	 * A literal also opts out of the Density axis: every other control shrinks with
+	 * --fs-density-box and the pager did not. Square because the glyph is an arrow, not a label. */
 	.pager .btn.prev, .pager .btn.next {
-		flex: 0 0 auto; width: 40px; min-width: 40px; height: 34px; padding: 0;
+		flex: 0 0 auto; width: var(--fs-ctl-h); min-width: var(--fs-ctl-h); height: var(--fs-ctl-h); padding: 0;
 		border-radius: var(--fs-radius); border: 1px solid var(--fs-border);
 		background: var(--fs-panel2); color: var(--fs-text);
 		display: inline-flex; align-items: center; justify-content: center;

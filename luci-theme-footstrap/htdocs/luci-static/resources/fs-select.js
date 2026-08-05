@@ -62,6 +62,27 @@ function resync(sel) {
 		dd.setValue(sel.value);
 }
 
+/* A VALUE written through the IDL is invisible to every observer there is.
+ *
+ * `sel.value = x` and `options[i].selected = true` — which is exactly what `ui.Select.setValue()`
+ * does, and `form.js`'s `updateDefaultValue()` calls it on every dependency pass — set no content
+ * attribute and add no node, so no MutationRecord is produced at all. relevant() therefore could
+ * never wake, resync() never ran, and the widget showed the old label while `getValue()` (and Save)
+ * read the new one. Reproduced on the router: `s.value = 'DROP'` left the widget unchanged.
+ *
+ * So this runs from the fitter, i.e. once per content mutation batch — the same cadence the tables
+ * already use — and it is deliberately the CHEAP half of resync(): a value compare per enhanced
+ * select, no choicesKey() over every option. Re-keying the widget stays behind relevant(), which now
+ * sees an option-list rebuild. */
+function resyncValues() {
+	for (const sel of document.querySelectorAll('select[data-fs-select]')) {
+		const dd = sel._fsDd;
+		if (!dd || !sel._fsNode || sel.disabled) continue;
+		if (dd.getValue() !== sel.value)
+			dd.setValue(sel.value);
+	}
+}
+
 function enhance(sel) {
 	if (sel.dataset.fsSelect || sel.disabled) return;	/* disabled: NOT marked — it may be enabled later */
 	/* `multiple` and "not in a CBI field" are permanent, so mark it and stop re-testing on
@@ -89,8 +110,24 @@ function enhance(sel) {
 	 * announces, and the visible widget nameless. Move the name over, drop the select from the
 	 * a11y tree. */
 	const title = sel.closest('.cbi-value')?.querySelector('.cbi-value-title');
-	if (title && title.textContent.trim())
-		node.setAttribute('aria-label', title.textContent.trim());
+	/* In a TABLE section there is no .cbi-value and no .cbi-value-title at all — form.js builds
+	 * `E('td', {class: 'td cbi-value-field'})` there — so on firewall zones, port forwards and
+	 * static leases the widget was left with no accessible name while the native select it replaces
+	 * is aria-hidden. The cell's `data-title` IS the column heading (LuCI fills it for the card
+	 * stack), which is the same string the header cell shows. */
+	const name = (title && title.textContent.trim()) ||
+		(sel.closest('.td')?.getAttribute('data-title') || '').trim();
+	if (name)
+		node.setAttribute('aria-label', name);
+	/* Clicking the field's caption must reach the widget. form.js wires that label to
+	 * `#widget.cbid…`.click()/focus() — which is the native <select> we just set `display: none` on,
+	 * so on this theme the click did nothing at all (measured: focus stayed on <body>, no list
+	 * opened), while stock bootstrap focuses the select. The <label for=…> is equally dead for the
+	 * same reason. Re-point the gesture at the visible control — focus only, which is the parity
+	 * stock gets: its `elem.click()` on a `<select>` opens no list either, so the gesture has always
+	 * meant "put me on this control". */
+	if (title)
+		title.addEventListener('click', () => node.focus(), { signal: ac.signal });
 	sel.setAttribute('aria-hidden', 'true');
 	sel._fsDd = dd;
 	sel._fsNode = node;
@@ -128,16 +165,59 @@ function enhance(sel) {
  *
  * `.table`, not `table.table` — the SAME selector relevant() and STACKABLE use. Stock LuCI
  * happens to emit only real <table>s, but a third-party luci-app-* may emit a <div class="table">
- * (coverage rule, CLAUDE.md), which a tag qualifier would pass over so it could never card. */
+ * (coverage rule, docs/conventions.md), which a tag qualifier would pass over so it could never card. */
 function tagDataTables() {
 	document.querySelectorAll('#view .table:not(.cbi-section-table):not(.fs-dt)').forEach((t) => {
-		/* TWO header markups, and missing the second is why the package list once needed a
-		 * stacking block of its own: L.ui.Table emits `.tr.table-titles`, the apk Software page
-		 * emits `.tr.cbi-section-table-titles`. EITHER header = a data table; NEITHER = a
-		 * key/value include (System, Memory), which must never card. */
-		if (t.querySelector('.tr.table-titles, .tr.cbi-section-table-titles'))
-			t.classList.add('fs-dt');
+		/* THREE header markups, and each missing one cost a page. L.ui.Table emits
+		 * `.tr.table-titles`; the apk Software page emits `.tr.cbi-section-table-titles` (missing
+		 * it is why the package list once needed a stacking block of its own); and a third-party
+		 * table may simply use a real `<thead>` — luci-mod-dashboard's device lists are
+		 * `<thead class="thead dashboard-bg"><th class="th nowrap">`, matching neither name. They
+		 * therefore never carded, and because those `th`s are `nowrap` they could not compress
+		 * either: on a phone the right-hand columns were cut off by .fs-main's overflow clip.
+		 * Reported from a router with wifi clients.
+		 *
+		 * `thead`, not `thead tr`: that markup is built by E(), which appends the `<th>`s straight
+		 * to the `<thead>` — the parser's implied row never happens, so a `tr` in the selector finds
+		 * nothing. Read as "the header ROW-ISH element", which is what its children are cells of.
+		 *
+		 * ANY of the three = a data table; NONE = a key/value include (System, Memory), which must
+		 * never card. `thead` is the structural form of the same statement the two classes make, so
+		 * it belongs in the same list rather than in a rule of its own. */
+		const head = t.querySelector('.tr.table-titles, .tr.cbi-section-table-titles, thead');
+		if (!head) return;
+		t.classList.add('fs-dt');
+		labelCells(t, head);
 	});
+}
+
+/* Give every cell the column heading it will show once the table cards.
+ *
+ * The card layout prints `attr(data-title)` above each value (theme/30-tables.css), and LuCI's own
+ * table builders fill that attribute in. A foreign table has no reason to: luci-mod-dashboard emits
+ * bare `<td class="td">`, so carding it would have produced a column of values with nothing saying
+ * which was the hostname and which the signal — worse than the clipped table it replaced.
+ *
+ * The heading is COPIED, not invented: it is the text of the header cell in the same position, so
+ * the card says exactly what the column header says. Never overwrites an existing data-title — if
+ * the app set one, that is the app's answer and it knows more than a positional guess. Cheap enough
+ * to re-run on every fit pass (it is skipped entirely once the cells carry the attribute), which
+ * matters because these tables are POLLED: the rows are replaced wholesale every few seconds, and
+ * the fresh ones arrive without it. */
+function labelCells(t, head) {
+	const titles = [ ...head.children ].map((c) => (c.textContent || '').trim());
+	if (!titles.some(Boolean)) return;
+	for (const row of t.querySelectorAll('.tr, tbody tr')) {
+		if (row === head) continue;
+		const cells = row.children;
+		for (let i = 0; i < cells.length; i++) {
+			if (i >= titles.length || !titles[i]) continue;
+			if (cells[i].hasAttribute('data-title')) continue;
+			/* a cell that spans columns has no single heading to take */
+			if (cells[i].colSpan > 1) continue;
+			cells[i].setAttribute('data-title', titles[i]);
+		}
+	}
 }
 
 /* ---- CARD-STACK A DATA TABLE THAT NO LONGER FITS --------------------------------
@@ -222,6 +302,78 @@ function fitTables() {
 	});
 }
 
+/* ---- A PINNED ACTIONS COLUMN IS ONLY VALID FOR THE LAYOUT MODE IT WAS MEASURED IN ----
+ *
+ * luci-base's `form.js` (stabilizeActionColumnWidth) measures the widest
+ * `td.cbi-section-actions > div` and writes that number as an INLINE `width` and `min-width` onto the
+ * header cell, the footer cell and every actions cell, caching it in `data-action-col-width`. It does
+ * re-run on window resize — but it only deletes the CACHE, never the inline widths, so the fresh
+ * measurement reads the width it pinned last time. The pin feeds itself and can only ever grow.
+ *
+ * On a stock theme that is invisible: a config table is a table at every width, so every measurement
+ * is taken in the same layout. This theme cards it under `@container fs-content (max-width: 960px)`
+ * (theme/65-dropdown.css), where the actions cell is `flex: 1 1 100%` and its buttons deliberately
+ * spread across the whole card — so a measurement taken there is the CARD's width, and carrying it
+ * into table mode makes the column absurd.
+ *
+ * Measured on the router, Network -> Firewall -> Zones: loaded at 1000px (carded) and grown to
+ * 1280px, the actions column pins 634px, the table renders 1267px inside a 1056px content column and
+ * the column scrolls sideways by 256px — permanently, because upstream's own re-measure reads the
+ * pin. A FRESH load at 1280px renders the same table at 966px with a 192px actions column. Shrinking,
+ * and growing within table mode, were always fine; it is the card -> table crossing that breaks.
+ *
+ * So drop the pin whenever the layout it was measured in stops being the layout on screen. Upstream
+ * re-measures from a clean DOM on its own resize listener and pins the right number; if it does not,
+ * the natural width is what we wanted anyway.
+ *
+ * THE KEY IS THE ROOM, NOT THE MODE, and starting from the mode alone missed half of it: the card ->
+ * table crossing is one way a pin goes stale, and the card simply getting NARROWER is the other. At
+ * 768px this theme has no sidebar (data-narrow) and the column is 712px; at 800px the sidebar returns
+ * and the column is 520px — the viewport grew, the room shrank, and the table was carded on both
+ * sides, so a mode test sees no change at all. Measured: firewall/zones and wireless both kept a
+ * `min-width: 670px` cell in a 520px column, 154px of scroll. Keying on the room catches both, since
+ * a mode change cannot happen without one.
+ *
+ * The room is the parent's content box (fit.roomFor), which the table's own width does not feed back
+ * into — so wiping the pin cannot change the key and set this oscillating. It fires once per CHANGE,
+ * never per tick, so it does not fight upstream for the pin on a polled page. */
+function unpinActionColumn() {
+	for (const t of document.querySelectorAll('#view .table.cbi-section-table')) {
+		if (!t.querySelector('.cbi-section-actions')) continue;
+		/* ---- and CLAIM upstream's resize hook, because under SPA navigation it is a leak ----
+		 *
+		 * stabilizeActionColumnWidth ends by attaching `window.addEventListener('resize', …)` once per
+		 * TABLE ELEMENT, guarded by this expando, and the callback closes over that element. Nothing
+		 * ever removes it. On a stock theme the next page is a full load and the listener dies with the
+		 * document; here the document lives for the whole session, so every visit to a config page
+		 * leaves another listener holding another detached table.
+		 *
+		 * Measured on the router over 120 navigations: window went from 1 resize listener to 31, and a
+		 * heap snapshot 280 navigations wide grew by 26 880 UniqueElementData, 23 600 Text nodes,
+		 * 18 520 EventListener and 1 160 <form> — a straight 11.8 KB per navigation that never
+		 * plateaus once the module cache is full.
+		 *
+		 * Setting the flag before upstream reaches it means the listener is never attached, and nothing
+		 * is lost: what it existed to do — re-measure the column when the width changes — is what the
+		 * wipe below now does, from the room rather than from a window event. The fitter runs
+		 * SYNCHRONOUSLY on the mutation batch that inserts the table (fs-fit rule 2), which is what
+		 * makes claiming it in time possible at all; a table we somehow reach late simply keeps
+		 * upstream's listener, i.e. today's behaviour. */
+		t.__actionColResizeAttached = true;
+		const key = Math.round(fit.roomFor(t));
+		if (t._fsActRoom === key) continue;
+		const seen = (t._fsActRoom !== undefined);
+		t._fsActRoom = key;
+		/* the first sighting is not a CHANGE: nothing has been pinned in another layout yet */
+		if (!seen) continue;
+		delete t.dataset.actionColWidth;
+		t.querySelectorAll('.cbi-section-actions').forEach((el) => {
+			el.style.removeProperty('width');
+			el.style.removeProperty('min-width');
+		});
+	}
+}
+
 /* Does this batch contain anything we could care about? Without it EVERY mutation scheduled a
  * full scan — and the poll rewrites content once a second, so on Overview/Processes/Leases we
  * ran three document-wide querySelectorAll plus a choicesKey() over every option of every
@@ -231,9 +383,19 @@ function relevant(mutations) {
 	/* attributeFilter narrows the ATTRIBUTE, not the element: `value`/`disabled` live on inputs
 	 * and buttons too, and a poll rewriting an input's value would otherwise wake the whole
 	 * scan. This half is ours alone; the added-node walk below is fs-fit's shared one. */
-	for (const m of mutations)
+	for (const m of mutations) {
 		if (m.type === 'attributes' && m.target.tagName === 'SELECT')
 			return true;
+		/* …and a REBUILT OPTION LIST. `sel.replaceChildren(new Option(…))` puts <option> elements in
+		 * addedNodes, and the shared walk below asks whether an added node IS or CONTAINS a select —
+		 * an <option> is neither, so the batch was dropped and resync() never re-keyed the widget.
+		 * Measured on the firewall page: after replaceChildren the native select listed AAA/BBB
+		 * while the widget still offered reject/drop/accept, and picking from the stale list wrote a
+		 * value the new list does not contain, i.e. `''`. CBI dependency handling rebuilds option
+		 * lists constantly, which is the case resync() was written for. */
+		if (m.type === 'childList' && m.target.tagName === 'SELECT')
+			return true;
+	}
 	/* `.table`, not `table.table` — the same selector tagDataTables() and STACKABLE use.
 	 * Additions only: a select or a table going away costs us nothing to notice. */
 	return fit.touches(mutations, 'select.cbi-input-select, .table');
@@ -343,7 +505,7 @@ return baseclass.extend({
 		/* A table must be TAGGED .fs-dt before it can be fitted, and re-tagged whenever the poll
 		 * brings a fresh one back — so the two travel as one fitter, which fs-fit runs now, on
 		 * every content mutation (synchronously, pre-paint) and on every resize of #view. */
-		fit.add(() => { tagDataTables(); fitTables(); });
+		fit.add(() => { tagDataTables(); fitTables(); unpinActionColumn(); resyncValues(); });
 
 		/* one scan per frame, however many mutations arrive (fit.frame — the theme's shared
 		 * coalescer) */

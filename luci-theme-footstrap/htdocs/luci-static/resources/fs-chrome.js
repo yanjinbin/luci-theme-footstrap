@@ -8,7 +8,7 @@
 /* The chrome AROUND the content: the mode menu, the section tabs, the rail toggle, and the
  * measurements that decide how much room any of it gets. The MAIN menu is not here — it is injected
  * by menu-footstrap.js as a callback (renderMainMenu), because LuCI instantiates every required
- * module into a singleton and so a renderer cannot be a subclass of the chrome (docs/11). */
+ * module into a singleton and so a renderer cannot be a subclass of the chrome (docs/conventions.md). */
 
 /* the injected main-menu renderer; handed over once by the theme's init() */
 let _renderMain = null;
@@ -102,21 +102,75 @@ function fitTabStrips() {
  * able to see it. Memoised because fitShell runs on every resize and mutation and getComputedStyle
  * forces a style recalc; the fallbacks stop an empty custom property making the measurement NaN
  * (`NaN < NaN` is false, so the sidebar would simply never yield). */
-let _geom = null;
+/* A CUSTOM PROPERTY IS UNTYPED, so its computed value is a token stream and not a length.
+ * `parseFloat(getComputedStyle(root).getPropertyValue('--fs-sidebar-w'))` therefore reads
+ * `calc(224px * 1)` — a string starting with `c` — and returns NaN, which the fallbacks below turn
+ * straight back into the literals this function exists to stop restating. It read correctly until
+ * the Density axis wrapped three of the four tokens in `calc(… * var(--fs-density-box))`; only
+ * `--fs-content-min`, still a bare `500px`, kept working, which is why the failure was one-sided
+ * and silent. Measured on the router: content-min 500, and sidebar/rail/pad all NaN.
+ *
+ * Resolve them the way the platform actually offers without registering the property: assign the
+ * token to a REAL length property on a throwaway element and read the used value back. */
+let _probe = null;
+/* THE PROBE IS A PLAIN <div> IN THE SHARED DOCUMENT, so a third-party app's CSS can style it, and
+ * every one of its declarations is !important for that reason alone. It carries no chrome mark, so
+ * `fs-sheets`'s fence deliberately does not spare it (the fence protects the chrome's own elements),
+ * and even a fenced sheet still matches an unmarked div. Issue #19: an app whose stylesheet carried
+ * `div { min-width: 500px !important }` won every read — all four tokens came back 500 — so the cut
+ * the sidebar was said to take became 500 + 2x500 and `fitShell` folded the sidebar into a bar on a
+ * 1857px desktop. The threshold that produces is exactly 500 + 500 + 1000 = 2000 CSS px, which is
+ * why it was reported as a ZOOM bug: Chrome at 90% gives 2063 CSS px and passed, 100% gives 1857 and
+ * failed. Inline !important is what answers it — a style-attribute declaration outranks any author
+ * rule at the same importance, so there is nothing left for the app to out-rank.
+ * box-sizing is stated for the same reason: getComputedStyle().width is the CONTENT box, so a
+ * foreign `border-box` plus padding would shave the reading (the padding/border resets below are
+ * important, but only a stated box-sizing makes them provably irrelevant). */
+function resolveLen(token, dflt) {
+	if (!_probe) {
+		_probe = document.createElement('div');
+		_probe.setAttribute('aria-hidden', 'true');
+		/* out of flow, no box, no ink: it must never affect layout, scroll extent or hit-testing */
+		_probe.style.cssText = 'position:absolute!important;visibility:hidden!important;' +
+			'pointer-events:none!important;height:0!important;box-sizing:content-box!important;' +
+			'min-width:0!important;max-width:none!important;border:0!important;' +
+			'padding:0!important;margin:0!important;';
+		document.body.appendChild(_probe);
+	}
+	_probe.style.setProperty('width', 'var(' + token + ')', 'important');
+	const v = parseFloat(getComputedStyle(_probe).width);
+	return Number.isFinite(v) ? v : dflt;
+}
+
+/* Memoised because fitShell runs on every resize and mutation and resolving forces a style recalc —
+ * but keyed on the DENSITY, because that is the one thing that changes these widths at runtime
+ * (`prefs.applyDensity()` stamps `:root[data-density]` and calls fit.schedule() precisely so they
+ * are re-measured). Reading one attribute is free; the memo without the key meant a density change
+ * re-measured against the widths of the density before it. */
+/* The last resort, stated ONCE so the fallbacks and the sanity net below cannot restate the
+ * stylesheet's widths in two different places. Reaching for these means the measurement failed. */
+const GEOM_DFLT = { contentMin: 500, sidebarW: 224, railW: 68, contentPad: 56 };
+
+let _geom = null, _geomDensity = null;
 function shellGeometry() {
-	if (_geom) return _geom;
-	const cs = getComputedStyle(document.documentElement);
-	const px = (name, dflt) => {
-		const v = parseFloat(cs.getPropertyValue(name));
-		return Number.isFinite(v) ? v : dflt;
-	};
-	_geom = {
-		contentMin: px('--fs-content-min', 500),
-		sidebarW:   px('--fs-sidebar-w', 224),
-		railW:      px('--fs-rail-w', 68),
+	const density = document.documentElement.getAttribute('data-density') || '';
+	if (_geom && _geomDensity === density) return _geom;
+	_geomDensity = density;
+	const px = (name, dflt) => resolveLen(name, dflt);
+	const g = {
+		contentMin: px('--fs-content-min', GEOM_DFLT.contentMin),
+		sidebarW:   px('--fs-sidebar-w', GEOM_DFLT.sidebarW),
+		railW:      px('--fs-rail-w', GEOM_DFLT.railW),
 		/* the token is ONE side's padding; the column loses it twice */
-		contentPad: px('--fs-content-pad', 28) * 2
+		contentPad: px('--fs-content-pad', GEOM_DFLT.contentPad / 2) * 2
 	};
+	/* Plausibility, and it costs one comparison: the rail IS the sidebar collapsed, so
+	 * 0 < railW < sidebarW holds by construction. Both known ways this measurement fails destroy
+	 * that — a hijacked probe reports ONE foreign width for all four (issue #19), a renamed or
+	 * absent token reports 0 for all four (an abs-positioned empty div with `width:auto` shrinks to
+	 * 0, and 0 is finite, so the per-read fallback above never fires). Neither can be seen in the
+	 * numbers one at a time; the RELATION between them is what gives it away. */
+	_geom = (g.railW > 0 && g.railW < g.sidebarW && g.contentMin > 0) ? g : Object.assign({}, GEOM_DFLT);
 	return _geom;
 }
 
@@ -128,7 +182,10 @@ function fitShell() {
 	}
 	const g = shellGeometry();
 	const cut = prefs.currentRail() ? g.railW : g.sidebarW;
-	const content = window.innerWidth - cut - g.contentPad;
+	/* clientWidth, not innerWidth: the column the content actually gets excludes a classic
+	 * scrollbar, and innerWidth includes it — 15-17px of phantom room on Linux/Windows, i.e. the
+	 * 500px floor really fired at ~484. */
+	const content = document.documentElement.clientWidth - cut - g.contentPad;
 	/* toggleAttribute, NOT setAttribute: a same-value setAttribute still QUEUES a mutation record
 	 * (measured in Chromium: 5 identical setAttribute('data-narrow','') -> 5 records; toggleAttribute
 	 * on an already-present attribute -> 0). fitShell runs from fitChrome, which fs-fit calls on every
@@ -231,7 +288,7 @@ function clusterFitsBrandRow(bar, menu) {
 	return need <= room;
 }
 /* No observer and no resize listener of our own: fs-fit owns both, and this file used to grow the
- * second one CLAUDE.md warns against. A view renders its .cbi-tabmenu into #view, which fs-fit's
+ * second one docs/conventions.md warns against. A view renders its .cbi-tabmenu into #view, which fs-fit's
  * MutationObserver already watches — and it re-fits SYNCHRONOUSLY (rule 2), where the copy here
  * deferred through fit.schedule(), i.e. the duplicate was strictly the slower path into the same
  * work. #tabmenu is a sibling of #view rather than inside it, but nothing writes it except
@@ -283,8 +340,13 @@ function renderChrome() {
 
 	if (L.env.dispatchpath.length >= 3) {
 		let node = root, url = '';
+		/* `node.children &&`, exactly as fs-menutree's nodeForSegs() walks it: a node without
+		 * children is an ordinary leaf, and reading `.children[…]` off one is a TypeError that
+		 * escapes renderChrome() — i.e. it takes out the mode menu, the tabs and, on the init path,
+		 * everything menu-footstrap-common wires after it. The walk already tests `node` on each
+		 * step; testing only half of what it dereferences is what left the hole. */
 		for (let i = 0; i < 3 && node; i++) {
-			node = node.children[L.env.dispatchpath[i]];
+			node = node.children && node.children[L.env.dispatchpath[i]];
 			url = url + (url ? '/' : '') + L.env.dispatchpath[i];
 		}
 		if (node)

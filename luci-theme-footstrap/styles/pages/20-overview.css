@@ -41,9 +41,9 @@
 		margin-top: var(--fs-space-0-5);
 	}
 
-	/* Stock overview layout: fs-overview.js wraps the stock System / Memory
-	 * / Storage sections in .fs-ovl; this is the grid only — System left across both rows,
-	 * Memory + Storage right. Stock styling and data untouched. */
+	/* Stock overview layout: fs-overview.js wraps the stock System / Memory / Storage
+	 * sections in .fs-ovl; this is the grid only — System left across both rows, Memory +
+	 * Storage right. Stock styling and data untouched. */
 	/* the chrome already shows the page title, so the stock <h2> is a duplicate */
 	body[data-page="admin-status-overview"] #view > h2[name="content"],
 	body[data-page="admin-status-overview"] #maincontent h2[name="content"] { display: none; }
@@ -117,7 +117,19 @@
 		 * (theirs did), on a Redmi AX6000. Naming all three costs nothing on stock, where `width` is
 		 * `auto` already. */
 		width: auto !important;
-		text-align: left;
+		/* …and THAT is only half of it, which 0.10.2 got wrong and made worse. The same fork writes
+		 * `align-items:center;justify-items:center` on the grid CONTAINER, so a tile's `justify-self`
+		 * resolves to `center` — and a centred item with `width: auto` is sized `fit-content`, not
+		 * stretched to its track. This card is `container-type: inline-size`, i.e. size-CONTAINED, so
+		 * its max-content contribution is ZERO: releasing the fork's `width:100px` handed the tile a
+		 * fit-content width of nothing but padding, and every row (name, speed, traffic) spilled out
+		 * to the right of a ~17px pill (reported against 0.10.2, ImmortalWrt 25.12 r37854).
+		 * Stating the self-alignment here needs NO flag — the fork's declarations are `*-items` on the
+		 * PARENT, which only supplies the value when the item says `auto`; a direct `*-self` wins on
+		 * the cascade proper. On stock, where both are already `stretch`, this is a no-op. */
+		justify-self: stretch;
+		align-self: stretch;
+		text-align: start;
 		background: var(--fs-panel2);
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius-lg);
@@ -187,7 +199,7 @@
 	/* speed: green when linked, dim when not */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(2) {
 		order: 2;								/* below the zone-colour line (child 3, order 1) */
-		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-good); text-align: left;
+		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-good); text-align: start;
 		/* Two halves of one mechanism.
 		 * `nowrap` (and NO `min-width: 0`) = "I do not give way": a flex item's automatic minimum
 		 * size is its min-content, which for nowrap text is the whole string — so the speed cannot be
@@ -205,7 +217,7 @@
 	 * text runs. The 11px flag fights the inline `font-size:80%`. */
 	body[data-page="admin-status-overview"] .ifacebox:has(img[src*="/port_"]) > .ifacebox-body:nth-child(4) {
 		order: 2;								/* shares the speed's row, below the zone line */
-		text-align: right;
+		text-align: end;
 		/* Grows but never shrinks. Growing is what anchors the figures to the card's right edge on
 		 * EITHER row — sharing the speed's, or one of its own — since `text-align: right` then has a
 		 * box that reaches that edge. `margin-left: auto` would have done the same job on a shared
@@ -228,7 +240,7 @@
 		 * the flex wrap above replaces: the cell now reaches the card's right edge on whichever row
 		 * it lands, so the alignment is one answer and there is no width at which to switch.
 		 * Deleting that threshold IS the fix — it is what had been calibrated on an English string. */
-		text-align: right !important;
+		text-align: end !important;
 	}
 
 	/* Meter rows — any stock .table row carrying a .cbi-progressbar (Memory, Storage, CPU
@@ -260,15 +272,16 @@
 	/* label. Undoes the key/value `white-space: nowrap` on a first column: a mount point
 	 * ("192.168.3.26:/volume1/… (/mnt/hdd_isync)") is one unbreakable line, so the row's
 	 * min-content width blew past the card and Memory/Storage stopped shrinking on a phone.
-	 * padding-right = the gutter for the value, which is pinned over the bar's right edge
+	 * padding-inline-end = the gutter for the value, which is pinned over the bar's far edge
 	 * (::after, out of flow — nothing else reserves space for it). */
 	body[data-page="admin-status-overview"] .cbi-section .table:not(:has(.tr.table-titles)) .tr:has(.cbi-progressbar) .td:first-child {
 		grid-column: 1; grid-row: 1;
 		align-self: center;
 		min-width: 0;
 		white-space: normal;
-		overflow-wrap: anywhere;
-		padding-right: min(200px, 50%);
+		/* overflow-wrap dropped — base/40-tables.css breaks every cell; the copy that stood here
+		 * moved nothing against 267 matching cells. */
+		padding-inline-end: min(200px, 50%);
 		font-size: var(--fs-type); font-weight: var(--fs-weight); color: var(--fs-text);
 	}
 	/* bar cell — spans full width on row 2 */

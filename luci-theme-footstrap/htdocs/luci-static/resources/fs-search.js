@@ -75,7 +75,12 @@ function walk(node, segs, trail, out, depth) {
 			 * "firewall". Both find it. */
 			t: title.toLowerCase(),
 			p: trail.join(' ').toLowerCase(),
-			n: csegs.join(' ').toLowerCase()
+			/* …minus the ROOT segment, which is `admin` on every single node. Indexed, it made
+			 * every substring of "admin" — a, ad, adm, dmi, min, in — a hit on all ~200 pages, so
+			 * `min` returned "Terminal", "Administration", "Attended Sysupgrade" and stopped at the
+			 * 20-result cap sorted only by depth (measured). It carries no information precisely
+			 * because it is shared by everything. */
+			n: csegs.slice(1).join(' ').toLowerCase()
 		});
 
 		if (depth < MAX_DEPTH)
@@ -166,6 +171,35 @@ function recentEntries() {
 	return _recent.map((p) => byPath.get(p)).filter(Boolean).slice(0, RECENT_MAX);
 }
 
+/* ---- warm the pages this admin actually uses ----
+ *
+ * The router's per-link prefetch needs a hover, a tap or a focus first, so the FIRST visit of a
+ * session to a page still pays for its module chain. The recents list is the best predictor of that
+ * page available anywhere in the theme — an admin lives in three or four of them — and it is already
+ * on disk. Walking the whole menu instead would pull every view module on the box, which is the cost
+ * docs/spa-router.md warns about; five recents is a handful of files.
+ *
+ * The current page is skipped: wire() has just remembered it, so it heads the list, and it is loaded
+ * by definition. saveData is the user saying "not over this link", and speculation is exactly what
+ * has to go then — the per-link prefetch stays, because that one follows a deliberate hover or tap. */
+const RECENT_WARM = 5;
+
+function warmRecent() {
+	try { if (navigator.connection && navigator.connection.saveData) return; } catch (e) {}
+	const here = (L.env.dispatchpath || []).join('/');
+	const paths = _recent.filter((p) => p !== here).slice(0, RECENT_WARM);
+	if (!paths.length) return;
+	/* Nothing waits on this, so it belongs after the page has settled — at idle, with a timeout for a
+	 * page that never goes idle (a busy poll). The fallback is deliberately a LONG timeout, unlike
+	 * fs-appearance's ~1 ms one: that wires a button the user may click immediately, this competes
+	 * with the view's own module fetches and RPCs and must lose that race on purpose. */
+	const go = () => paths.forEach((p) => router.prefetchSegs(p.split('/')));
+	if (typeof window.requestIdleCallback === 'function')
+		window.requestIdleCallback(go, { timeout: 4000 });
+	else
+		window.setTimeout(go, 2000);
+}
+
 /* ---- the palette -------------------------------------------------------- */
 
 const MAX_RESULTS = 20;
@@ -180,6 +214,8 @@ function wire() {
 	/* The callback is handed the RESOLVED segments of the incoming page: reading L.env here would
 	 * give the OUTGOING one, since the router fires its callbacks before it re-points L.env. */
 	router.onNavigate(remember);
+	/* after remember(), so the page we are standing on is the one head of the list that gets skipped */
+	warmRecent();
 
 	const input = E('input', {
 		'type': 'text',
@@ -206,7 +242,7 @@ function wire() {
 		note,
 		list
 	]);
-	/* data-fs-chrome marks a Zone 1 ROOT (CLAUDE.md): this is a `position: fixed` overlay parented
+	/* data-fs-chrome marks a Zone 1 ROOT (docs/third-party-apps.md): this is a `position: fixed` overlay parented
 	 * to <body>, i.e. outside the <nav> that carries the mark in header.ut — exactly the shape that
 	 * once left the Appearance popover unfenced while every test said the chrome was defended. */
 	const ov = E('div', {
@@ -220,7 +256,22 @@ function wire() {
 	}, [ box ]);
 	document.body.appendChild(ov);
 
-	let opts = [], at = -1;
+	let opts = [], ents = [], at = -1;
+
+	/* Warm the highlighted page's module chain, DEBOUNCED. render() re-runs setActive(0) on every
+	 * keystroke, so warming immediately would pull the top result of "w", "wi", "wir"… and only the
+	 * last of those is a page anyone asked for. The delay also matches how the list is used: the
+	 * highlight settles, then Enter. Only the ARROW KEYS and typing need this — the rows are real
+	 * anchors in the document, so a mouse moving over one already reaches the router's own pointerover
+	 * listener. warmClass() dedupes per class, so a row revisited costs nothing. */
+	let warmT = null;
+	function warmActive() {
+		if (warmT) window.clearTimeout(warmT);
+		warmT = window.setTimeout(() => {
+			warmT = null;
+			if (ents[at]) router.prefetchSegs(ents[at].segs);
+		}, 200);
+	}
 
 	function setActive(i) {
 		if (!opts.length) { at = -1; input.removeAttribute('aria-activedescendant'); return; }
@@ -232,10 +283,12 @@ function wire() {
 		});
 		input.setAttribute('aria-activedescendant', opts[at].id);
 		opts[at].scrollIntoView({ block: 'nearest' });
+		warmActive();
 	}
 
 	function render(q) {
 		const entries = q ? search(q, MAX_RESULTS) : recentEntries();
+		ents = entries;
 		list.innerHTML = '';
 		opts = entries.map((e, i) => {
 			/* role="option" on the <a> rather than a <div> wrapping one: an option may not contain
@@ -322,6 +375,13 @@ function wire() {
 	ov.addEventListener('click', (ev) => { if (ev.target === ov) close(); });
 
 	btn.addEventListener('click', () => { ov.hidden ? open() : close(); });
+
+	/* Back and Forward are navigations no listener here can see: every close above is a user act on
+	 * the document (Escape, the scrim, the trigger, picking a result). An open palette therefore rode
+	 * a popstate onto the next page, aria-modal and Tab-trapped, while the router moved focus behind
+	 * it. Same reasoning as the Appearance popover's — see fs-appearance.js. returnFocus=false because
+	 * the router places focus itself on a navigation. */
+	router.onNavigate(() => close(false));
 
 	/* Ctrl/Cmd+K is the shortcut every command palette has taught users, and `/` is the one every
 	 * search field on the web has. `/` only when the user is not already typing somewhere: an

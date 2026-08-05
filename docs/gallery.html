@@ -116,10 +116,40 @@ uci commit network</pre>
 
 <div class="g-sec">
 	<h2>Page action bar</h2>
+	<!-- The Save &amp; Apply split control, copied from what ui.js ACTUALLY emits (captured off a
+	     live 25.12 router on admin/network/firewall). The classes are on the WRAPPER — it is a
+	     ui.Dropdown wearing `btn cbi-button cbi-button-apply` — and the label is an <li> inside its
+	     own <ul>, not a nested <button>. The shape here used to be `<div class="cbi-dropdown">` with
+	     an inner button, which is not a shape LuCI produces: the wrapper then matched the theme's
+	     `.cbi-dropdown:not(.btn):not(.cbi-button)` field rule and rendered as a grey box glued to a
+	     blue button. Anyone reading this card diagnosed a bug the theme does not have. -->
 	<div class="cbi-page-actions">
-		<div class="cbi-dropdown" tabindex="0">
-			<button class="cbi-button cbi-button-apply">Save &amp; Apply</button>
-			<span class="open">▾</span>
+		<div class="cbi-dropdown btn cbi-button cbi-button-apply important" tabindex="0" data-idref="g-apply">
+			<ul tabindex="-1">
+				<li data-value="0" selected display="0">Save &amp; Apply</li>
+				<li data-value="1">Apply unchecked</li>
+			</ul>
+			<span class="more" tabindex="-1">···</span>
+			<span class="open" tabindex="-1">▾</span>
+			<div><input type="hidden" value="0"></div>
+		</div>
+		<button class="cbi-button cbi-button-save">Save</button>
+		<button class="cbi-button cbi-button-reset">Reset</button>
+	</div>
+	<!-- The SAME control after the user picks the second mode. The class on the wrapper is the one
+	     ui.js chose for the selected value (luci.js's ComboButton `classes` map: 0 -> cbi-button-apply,
+	     1 -> cbi-button-negative), so this is not a variant of the card above but its other half —
+	     and it is the half that was invisible: a blanket `.cbi-page-actions .cbi-dropdown` rule
+	     erased the negative fill and left --fs-on-danger on the page behind it, 1.13:1 in dark. -->
+	<div class="cbi-page-actions">
+		<div class="cbi-dropdown btn cbi-button cbi-button-negative important" tabindex="0" data-idref="g-apply-unchecked">
+			<ul tabindex="-1">
+				<li data-value="0">Save &amp; Apply</li>
+				<li data-value="1" selected display="0">Apply unchecked</li>
+			</ul>
+			<span class="more" tabindex="-1">···</span>
+			<span class="open" tabindex="-1">▾</span>
+			<div><input type="hidden" value="1"></div>
 		</div>
 		<button class="cbi-button cbi-button-save">Save</button>
 		<button class="cbi-button cbi-button-reset">Reset</button>
@@ -379,10 +409,17 @@ option two</textarea></div>
 
 <div class="g-sec">
 	<h2>Tabs</h2>
+	<!-- TWO strips, TWO active markers, and the difference is not cosmetic: `ul.tabs` is the
+	     THEME's own section strip (fs-chrome.js renderTabMenu) and marks the current page with
+	     `.active` + `aria-current="page"`, on an `li.tabmenu-item-<name>`; `ul.cbi-tabmenu` is
+	     ui.js's in-form strip and marks it with `.cbi-tab`. theme/40-tabs.css says so and styles
+	     both. This card used to write `<li class="cbi-tab">` in BOTH, so the first strip rendered
+	     with NO active tab at all (measured: all three li carried the muted ink) — a shape nothing
+	     can emit, which is exactly what a card must not show. -->
 	<ul class="tabs">
-		<li class="cbi-tab"><a href="#">General Settings</a></li>
-		<li class="cbi-tab-disabled"><a href="#">Advanced</a></li>
-		<li class="cbi-tab-disabled" data-errors="1"><a href="#">With errors</a></li>
+		<li class="tabmenu-item-general active"><a href="#" aria-current="page">General Settings</a></li>
+		<li class="tabmenu-item-advanced"><a href="#">Advanced</a></li>
+		<li class="tabmenu-item-errors cbi-tab-disabled" data-errors="1"><a href="#">With errors</a></li>
 	</ul>
 	<ul class="cbi-tabmenu">
 		<li class="cbi-tab"><a href="#">Mode A</a></li>
@@ -412,6 +449,18 @@ option two</textarea></div>
 		<p>Body.</p>
 		<ul><li>a list item</li><li>another one</li></ul>
 		<pre>a &lt;pre&gt; block inside an alert</pre>
+	</div>
+	<!-- A table INSIDE an alert: the firmware Current/Available readout (admin/system/flash). The
+	     theme flattens it so it does not read as a card on a card, and that rule had never been
+	     rendered by anything here — a padding change to it measured 0 diffs because the shape was
+	     missing. -->
+	<div class="alert-message warning">
+		<h4>Firmware update available</h4>
+		<table class="table">
+			<tr class="tr table-titles"><th class="th">Field</th><th class="th">Current</th><th class="th">Available</th></tr>
+			<tr class="tr"><td class="td">Version</td><td class="td">25.12.0</td><td class="td">25.12.1</td></tr>
+			<tr class="tr"><td class="td">Size</td><td class="td">7.8 MB</td><td class="td">7.9 MB</td></tr>
+		</table>
 	</div>
 </div>
 
@@ -445,6 +494,24 @@ option two</textarea></div>
 			<select id="g-cbisel-bad" class="cbi-select cbi-input-invalid"><option>rejected value</option></select>
 		</div>
 	</div>
+	<!-- The other shape, and the one every check was blind to: luci-compat wraps the native select
+	     in a DIV that carries the class, so `.cbi-select:not(select)` is a real element with a real
+	     `select` child. Only this shape gets the shell paint (a replaced element cannot), which is
+	     why the theme has a `:not(select)` rule at all — and with no example here, nothing measured
+	     it. `[disabled]` is separate on purpose: base dims only the shell's ::before, so the state
+	     is easy to lose. -->
+	<div class="cbi-value">
+		<label class="cbi-value-title" for="g-cbisel-shell">.cbi-select (the DIV shell)</label>
+		<div class="cbi-value-field">
+			<div class="cbi-select"><select id="g-cbisel-shell"><option>one</option><option>two</option></select></div>
+		</div>
+	</div>
+	<div class="cbi-value">
+		<label class="cbi-value-title" for="g-cbisel-off">.cbi-select[disabled] (the DIV shell)</label>
+		<div class="cbi-value-field">
+			<div class="cbi-select" disabled><select id="g-cbisel-off" disabled><option>unavailable</option></select></div>
+		</div>
+	</div>
 </div>
 
 <div class="g-sec">
@@ -459,7 +526,13 @@ option two</textarea></div>
 	<div class="g-row">
 		<span class="ifacebadge">eth0</span>
 		<span class="ifacebadge ifacebadge-active">br-lan</span>
-		<span class="zonebadge" style="background:#a4d1a4">lan</span>
+		<!-- The inline style is firewall.js's getZoneColorStyle() verbatim: it declares
+		     --zone-color-rgb and then paints FROM it. Writing a plain `background:#a4d1a4` here
+		     was wrong in a way only dark mode shows: base/95-luci.css re-mixes the zone colour at
+		     .4/.3 for dark, reading that var with NO fallback (deliberately — see the comment
+		     there), so the !important declaration went invalid at computed-value time and the
+		     badge lost its colour entirely (measured: background rgba(0,0,0,0) in dark). -->
+		<span class="zonebadge" style="--zone-color-rgb:164, 209, 164; background-color:rgb(var(--zone-color-rgb))">lan</span>
 		<span class="zonebadge zonebadge-empty">empty</span>
 		<span class="label">label</span>
 		<span class="label notice">notice</span>
@@ -475,6 +548,29 @@ option two</textarea></div>
 		<div class="ifacebox" style="min-width:70px;max-width:120px">
 			<div class="ifacebox-head center">lan2</div>
 			<div class="ifacebox-body left">no link</div>
+		</div>
+	</div>
+	<!-- The Overview's upstream plates (30_network.js): the SAME .ifacebox classes as the port
+	     tiles above, wrapped in .network-status-table, and the reason that wrapper is styled
+	     separately — these lines are ADDRESSES. The IPv6 one is deliberately uncompressed and
+	     full length, because that is the case that broke: `.ifacebox` is `white-space: nowrap`,
+	     an address has no spaces to wrap at, and the plate is a flex item that shrinks — so the
+	     address printed outside its own border (measured at a 390px viewport: 45px past it).
+	     Narrow the window here and the text must stay inside the box. -->
+	<div class="network-status-table">
+		<div class="ifacebox">
+			<div class="ifacebox-head center active"><strong>IPv4 Upstream</strong></div>
+			<div class="ifacebox-body left">
+				<span><strong>Protocol:</strong> Static address<br><strong>Address:</strong> 203.0.113.42/24<br><strong>Gateway:</strong> 203.0.113.1<br><strong>DNS:</strong> 9.9.9.9<br><strong>Connected:</strong> 8d 12h 0m 57s</span>
+				<div><span class="ifacebadge"><img src="/luci-static/resources/icons/ethernet.svg" width="16" alt=""><span><strong>Device:</strong> Ethernet Adapter: "wwan0"<br><strong>MAC address:</strong> C6:68:C6:D1:EF:25</span></span></div>
+			</div>
+		</div>
+		<div class="ifacebox">
+			<div class="ifacebox-head center active"><strong>IPv6 Upstream</strong></div>
+			<div class="ifacebox-body left">
+				<span><strong>Protocol:</strong> Static address<br><strong>Prefix Delegated:</strong> 2001:db8:1a2b:3c4e:5e6f:7a8b:9c0d::/64<br><strong>Address:</strong> 2001:db8:1a2b:3c4d:5e6f:7a8b:9c0d:1e2f/64<br><strong>Gateway:</strong> 2001:db8:1a2b:3c4d::1<br><strong>Connected:</strong> 8d 12h 0m 57s</span>
+				<div><span class="ifacebadge"><img src="/luci-static/resources/icons/ethernet.svg" width="16" alt=""><span><strong>Device:</strong> Ethernet Adapter: "wwan0"<br><strong>MAC address:</strong> C6:68:C6:D1:EF:25</span></span></div>
+			</div>
 		</div>
 	</div>
 	<div class="g-row">
@@ -514,15 +610,29 @@ option two</textarea></div>
 				<td class="td">F4:A3:10:96:E0:53</td><td class="td">8h 56m 4s</td>
 				<td class="td"><button class="cbi-button cbi-button-apply">Reserve IP</button></td>
 			</tr>
+			<!-- …and the SAME button mid-click, which is the shape issue #22 was reported on:
+			     40_dhcp.js adds `spinning` to the button it was clicked on, and this row is inside
+			     a `.table[id]`, whose cell-button rule is (0,5,0) — the rule that used to out-rank
+			     the spinner's padding ladder and draw the glyph on top of the label. Rendered here
+			     so a regression is visible without a router (issue #15 was the same bug one rule
+			     lower down, and neither was in the gallery). -->
+			<tr class="tr cbi-rowstyle-1">
+				<td class="td">nb-ivan</td><td class="td">10.11.12.144</td>
+				<td class="td">A2:9C:41:07:BB:10</td><td class="td">2h 28m 11s</td>
+				<td class="td cbi-section-actions"><button class="cbi-button cbi-button-apply spinning" disabled>Reserve IP</button></td>
+			</tr>
 		</table>
 	</div>
 
 	<h2>The forcing utilities (.left/.right/.center + .top/.middle/.bottom)</h2>
 	<!-- LuCI writes these on a cell to OVERRIDE the table's own alignment — `<td class="td right">`
-	     — which is why they carry the theme's only legitimate `!important`s outside the
-	     reduced-motion block: a bare `.right` (0,1,0) loses to the theme's `.cbi-section .table .td`
-	     (0,3,0) on specificity alone. Nothing rendered them, so stripping the flags showed no diff
-	     and read as "the flags do nothing". They do. -->
+	     — which is why they carry an `!important`: a bare `.right` (0,1,0) loses to the theme's
+	     `.cbi-section .table .td` (0,3,0) on specificity alone. Six of the eight flags in
+	     styles/base are these. Nothing rendered them, so stripping the flags showed no diff and
+	     read as "the flags do nothing". They do. (They are not the theme's ONLY flags outside the
+	     reduced-motion block, which is what this comment used to claim: there are 22 of those, each
+	     fighting an inline `style=` or an unlayered `<style>` — docs/conventions.md accounts for
+	     every one.) -->
 	<div class="cbi-section">
 		<table class="table" id="forcing-utils">
 			<tr class="tr table-titles">

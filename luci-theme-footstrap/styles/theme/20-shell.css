@@ -1,6 +1,6 @@
 @layer theme {
 	/* FOOTSTRAP SHELL — layout + chrome over styles/base.
-	 * Markup: ucode/template/themes/footstrap/header.ut · spec: docs/09 */
+	 * Markup: ucode/template/themes/footstrap/header.ut · spec: docs/chrome.md */
 
 
 	body {
@@ -38,9 +38,21 @@
 	.fs-chevron {
 		width: 14px; height: 14px; flex: 0 0 auto;
 		color: var(--fs-dim);
-		transition: transform var(--fs-dur-move);
+		transition: rotate var(--fs-dur-move);
 	}
-	.fs-sidebar ul.nav > li.open > a .fs-chevron { transform: rotate(90deg); }
+	/* `rotate`, not `transform: rotate()`: the INDIVIDUAL transform properties compose across
+	 * rules, so the RTL mirror below can set `scale` without either rule having to restate the
+	 * other's value. The fixed order is translate -> rotate -> scale, so a mirrored chevron still
+	 * points down when it opens. */
+	.fs-sidebar ul.nav > li.open > a .fs-chevron { rotate: 90deg; }
+	/* ---- the two chevrons are DIRECTION, and direction is what mirrors ----
+	 * A disclosure marker and the rail's collapse arrow both point ALONG the reading axis: `›` means
+	 * "opens away from the menu" and the rail arrow means "the sidebar folds towards its own edge".
+	 * With the document flipped (head.ut stamps dir), both pointed back at themselves. Everything
+	 * else in the chrome mirrors from the logical properties; these two are glyphs, so they need the
+	 * one transform. */
+	:root[dir="rtl"] .fs-chevron,
+	:root[dir="rtl"] .fs-railtoggle .fs-ico { scale: -1 1; }
 	.fs-sidebar ul.nav > li.has-sub > a { cursor: pointer; }
 	.fs-sidebar ul.nav ul {
 		list-style: none;
@@ -81,7 +93,7 @@
 		background: var(--fs-bar-bg);
 		backdrop-filter: var(--fs-blur);
 		-webkit-backdrop-filter: var(--fs-blur);
-		border-right: 0; border-bottom: 1px solid var(--fs-border);
+		border-inline-end: 0; border-bottom: 1px solid var(--fs-border);
 		/* the submenu popups anchor to this bar and must escape it */
 		overflow: visible;
 	}
@@ -106,7 +118,15 @@
 		order: 3; flex: 1 1 100%;
 		flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--fs-space-0-5);
 	}
-	.fs-sidebar ul.nav > li.has-sub { position: static; }
+	/* the dropdown hangs off its OWN item — in EVERY bar state, which is what this used to get
+	 * wrong (issue #19). `position: static` + a panel pinned at `left: 16px` was the bar's base,
+	 * and only the top layout's delta re-anchored it per item; so the sidebar layout collapsed
+	 * onto a bar (data-narrow, i.e. a desktop window narrowed past --fs-content-min) opened a
+	 * hover panel at the bar's LEFT EDGE while its trigger sat mid-bar. Measured at 760px: item
+	 * at x=253, panel at x=32 — travelling down to the panel leaves the <li>, nothing bridges
+	 * the diagonal and the CSS hover closes it, so no submenu entry could be reached at all.
+	 * A phone never showed it: `hover: none` disables the hover rule outright. */
+	.fs-sidebar ul.nav > li.has-sub { position: relative; }
 	.fs-sidebar ul.nav > li > a {
 		display: flex; align-items: center;
 		padding: var(--fs-space-1-5) var(--fs-space-3); border-radius: var(--fs-radius);
@@ -117,18 +137,27 @@
 	.fs-sidebar ul.nav > li > a .fs-ico,
 	.fs-sidebar ul.nav > li > a .fs-chevron { display: none; }
 
-	/* submenu = a popup card: sized to its content rather than stretched across the bar, and
-	 * capped to the viewport so a long label wraps instead of overflowing. */
+	/* submenu = a popup card under its own item: sized to its content rather than stretched
+	 * across the bar, and capped to the viewport so a long label wraps instead of overflowing.
+	 * `left: 0` = the item's left edge (the <li> above is the containing block); an item near
+	 * the right edge is nudged back inside by menu-footstrap.js clampDropdown, in every bar
+	 * state — the JS gate is the same question this rule asks, not a layout test. */
 	.fs-sidebar ul.nav ul,
 	.fs-sidebar ul.nav > li.open > ul {
 		display: none;
-		position: absolute; left: 16px; right: auto; top: calc(100% + 8px); z-index: var(--fs-z-flyout);
+		position: absolute; inset-inline: 0 auto; top: calc(100% + 8px); z-index: var(--fs-z-flyout);
 		width: max-content; min-width: 200px; max-width: calc(100vw - 32px);
 		margin: 0; padding: var(--fs-space-2);
 		background: var(--fs-glass);
 		backdrop-filter: var(--fs-blur); -webkit-backdrop-filter: var(--fs-blur);
 		border: 1px solid var(--fs-border);
 		border-radius: var(--fs-radius-lg); box-shadow: var(--fs-shadow-pop);
+	}
+	/* an invisible bridge across the 8px gap, so travelling from the item down into the panel
+	 * does not drop the hover and close it. Belongs to the BAR, not to one layout: the hover
+	 * rule below is unguarded, so every state that can open a panel on hover needs it. */
+	.fs-sidebar ul.nav > li.has-sub > ul::before {
+		content: ""; position: absolute; inset-inline: 0; top: -10px; height: 10px;
 	}
 	/* hover only on a real pointer: a tap leaves :hover stuck on mobile browsers, which
 	 * would block tap-to-close */
@@ -148,18 +177,18 @@
 	 * only shows when there is something to report. */
 	.fs-sidebar #indicators {
 		display: flex; flex-wrap: wrap; gap: var(--fs-space-1-5);
-		order: 2; margin-left: auto; padding: 0;
+		order: 2; margin-inline-start: auto; padding: 0;
 	}
 	.fs-themerow {
 		display: flex; align-items: center; justify-content: center;
-		flex: 0 0 auto; order: 2; margin-left: auto;
-		/* see the :not(:empty) rule below — two margin-left:autos would SPLIT the free
-		 * space between them instead of pushing one cluster to the right edge */
+		flex: 0 0 auto; order: 2; margin-inline-start: auto;
+		/* see the :not(:empty) rule below — two auto margins would SPLIT the free space between
+		 * them instead of pushing one cluster to the bar's far edge */
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
 		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
 		background: var(--fs-panel2); color: var(--fs-dim);
 		font: inherit; font-weight: var(--fs-weight); font-size: var(--fs-type); line-height: 1.1;
-		text-align: left; cursor: pointer;
+		text-align: start; cursor: pointer;
 		transition: background var(--fs-dur), border-color var(--fs-dur), color var(--fs-dur);
 	}
 	/* ==================================================================
@@ -178,7 +207,7 @@
 	 * (fitChrome's own escalation sets the same class for that reason).
 	 * Step 2, .fs-bar-actrow: the cluster still does not fit, so the brand row takes the full width
 	 * and the whole cluster moves down together. It keeps the right edge for free — the first
-	 * rendered cluster member already carries margin-left:auto (above). max-width must be released
+	 * rendered cluster member already carries the auto inline-start margin (above). max-width must be released
 	 * along with the flex basis, or the 30ch cap leaves the brand short of the row it was just
 	 * given and the cluster rides back up beside it.
 	 * ================================================================== */
@@ -214,15 +243,15 @@
 		/* @endmirror */
 	}
 
-	/* Exactly ONE member of the right cluster may carry margin-left:auto, and it must be the
+	/* Exactly ONE member of the far-edge cluster may carry an auto inline-start margin, and it must be the
 	 * FIRST one actually rendered. #indicators is earlier in the DOM, so when the poll pill
 	 * shows IT opens the gap and .fs-themerow's auto must stand down — otherwise flexbox
 	 * SPLITS the free space between the two and the pill drifts away from the buttons.
 	 * .fs-themerow keeps its own auto for when the pill is empty and collapsed. */
-	.fs-sidebar #indicators:not(:empty) ~ .fs-themerow { margin-left: 0; }
+	.fs-sidebar #indicators:not(:empty) ~ .fs-themerow { margin-inline-start: 0; }
 	/* …and there are TWO .fs-themerow buttons now (Search, then Appearance), so the same split
 	 * would happen between THEM whenever the pill is collapsed: the second one stands down too. */
-	.fs-themerow ~ .fs-themerow { margin-left: 0; }
+	.fs-themerow ~ .fs-themerow { margin-inline-start: 0; }
 	.fs-logout {
 		flex: 0 0 auto; order: 2; justify-content: center;
 		width: var(--fs-btn-size); height: var(--fs-btn-size); padding: 0;
@@ -297,7 +326,7 @@
 			gap: normal; padding: var(--fs-space-5) var(--fs-space-3-5);
 			background: var(--fs-panel);
 			backdrop-filter: none; -webkit-backdrop-filter: none;
-			border-right: 1px solid var(--fs-border); border-bottom: 0;
+			border-inline-end: 1px solid var(--fs-border); border-bottom: 0;
 			box-shadow: none;
 			/* `overflow: auto`, not overflow-y alone: the bar sets `overflow: visible` for its
 			 * popups, and a lone overflow-y here would leave overflow-x visible — which the
@@ -352,7 +381,7 @@
 			/* the bar anchors this panel under itself (absolute + top/left); an accordion is
 			 * just the next block in the column, so the offsets must go back to auto or they
 			 * linger in the computed style */
-			position: static; top: auto; left: auto; right: auto; z-index: auto;
+			position: static; top: auto; inset-inline: auto; z-index: auto;
 			width: auto; min-width: 0; max-width: none;
 			flex-direction: column; gap: var(--fs-space-0-5);
 			margin: 0 0 0 var(--fs-space-7); padding: 0;
@@ -360,6 +389,12 @@
 			border: 0; border-radius: 0; box-shadow: none;
 			overflow: hidden;
 		}
+		/* and the bar's hover bridge goes with the popup. The panel is static here, so the
+		 * bridge's containing block falls back to the <li> — an invisible 10px strip sitting
+		 * ABOVE the section, i.e. over the previous menu item, swallowing its clicks. The rail
+		 * (below) is a popup again but flies its panel out sideways, and brings its own
+		 * horizontal bridge (li.has-sub::after). */
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub > ul::before { content: none; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.open > ul { display: flex; margin: var(--fs-space-0-5) 0 var(--fs-space-1-5) var(--fs-space-7); }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav > li.has-sub.open > ul { display: flex; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar ul.nav ul a { padding: var(--fs-space-2) var(--fs-space-3); }
@@ -367,14 +402,14 @@
 		/* the Appearance trigger and Log out are full-width text rows down here */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow,
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout {
-			order: 0; margin-left: 0;
+			order: 0; margin-inline-start: 0;
 			width: 100%; height: auto;
 			justify-content: normal;
 			gap: var(--fs-space-3); padding: var(--fs-space-2-5) var(--fs-space-3);
 			border: 0; border-radius: var(--fs-radius);
 			background: transparent;
 		}
-		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow { text-align: left; }
+		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow { text-align: start; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout { font-weight: var(--fs-weight); font-size: var(--fs-type); }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-logout:hover { background: var(--fs-panel2); border-color: transparent; }
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-themerow:hover,
@@ -384,7 +419,7 @@
 
 		/* the poll pill sits in the sidebar footer, above Appearance */
 		:root[data-layout="sidebar"]:not([data-narrow]) .fs-sidebar #indicators {
-			order: 0; margin-left: 0;
+			order: 0; margin-inline-start: 0;
 			flex-wrap: wrap; gap: var(--fs-space-1-5);
 			padding: 0 var(--fs-space-1-5) var(--fs-space-1);
 		}
@@ -399,206 +434,10 @@
 	}
 
 
-	/* Appearance popover (Mode, Palette, Tint, Accent, Rounding, Layout). The trigger is
-	 * .fs-themerow in every layout; the popover itself is parented to <body> and positioned
-	 * by fs-appearance.js (widgets.placePopover), because the vertical .fs-sidebar sets `overflow: auto`,
-	 * which would clip an absolutely-positioned child. */
-	.fs-appearance-pop {
-		position: fixed; z-index: var(--fs-z-popover); left: 0; top: 0;
-		min-width: 216px; padding: var(--fs-space-3);
-		background: var(--fs-panel); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
-		box-shadow: var(--fs-shadow-pop);
-		display: flex; flex-direction: column; gap: var(--fs-space-3);
-		animation: fs-fade var(--fs-dur);
-		/* The popover carries eight axes plus the wallpaper sub-panel and the footer, so on a short
-		 * viewport (a phone in landscape, a netbook) it is taller than the screen — and placePopover
-		 * can only MOVE it, never shrink it: the clamp pins top to the gap and the foot (Save as
-		 * default / Reset / Update) runs off the bottom with no way to reach it. Cap it to the
-		 * viewport and let it scroll instead. 16px is 2 x EDGE_GAP from fs-widgets.js — the same
-		 * margin the placement keeps on both edges; deliberately a literal and not --fs-space-2,
-		 * which the density axis scales while EDGE_GAP stays 8. dvh, not vh, so a phone's collapsing
-		 * URL bar does not hide the last row. offsetHeight/offsetWidth are read AFTER this applies,
-		 * so the clamp then always lands the whole popover on screen. */
-		max-height: calc(100dvh - 16px); max-width: calc(100vw - 16px); overflow: hidden auto;
-		overscroll-behavior: contain;
-	}
-	.fs-appearance-pop[hidden] { display: none; }
-
-	.fs-ap-group { display: flex; flex-direction: column; gap: var(--fs-space-1-5); }
-	/* The accordion switch is meaningless in the top layout — its sections are hover dropdowns,
-	 * already exclusive. Hidden HERE, not by a branch in the JS: the popover is built once at
-	 * init, so a branch froze the control to whatever layout the page loaded in and the live
-	 * toggle could never change it. */
-	:root[data-layout="top"] .fs-ap-submenus { display: none; }
-	.fs-ap-label { font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight); letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase; color: var(--fs-eyebrow-color); }
-
-	/* Save-as-default / Reset row: two equal buttons, no status text — the Save button's own
-	 * label/disabled state is the status. They take their look from .btn / .cbi-button-action
-	 * (base + theme/55-buttons.css); a disabled .cbi-button-action already greys via base. */
-	.fs-ap-actrow { display: flex; gap: var(--fs-space-2); }
-	.fs-ap-actrow .btn { flex: 1; font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
-	.fs-ap-actrow .btn:disabled { cursor: default; }
-	/* the primed Reset (second click confirms) reads as the destructive action it is */
-	.fs-ap-armed { color: var(--fs-on-danger); background: var(--fs-danger); border-color: transparent; }
-	/* Save's only visible failure line (a rejected save rpc — usually a stale session) — shown in
-	 * place of the absent status text, hidden until a save actually fails. */
-	.fs-ap-err { margin-top: var(--fs-space-2); font-size: var(--fs-type-xs); line-height: 1.35; color: var(--fs-danger); }
-
-	/* Wallpaper control: the segmented switch, and — only when File is picked — the upload sub-panel
-	 * below it. The preview shows the uploaded photo at a small fixed aspect so the popover height is
-	 * stable; Choose image and Remove share ONE row beneath it, Remove appearing only once a photo
-	 * exists (so Choose takes the full width until then). */
-	.fs-ap-wall { display: flex; flex-direction: column; gap: var(--fs-space-2); }
-	.fs-ap-bg { display: flex; flex-direction: column; gap: var(--fs-space-2); }
-	.fs-ap-bgprev {
-		display: block; width: 100%; height: 84px; object-fit: cover;
-		border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
-	}
-	.fs-ap-bgrow { display: flex; gap: var(--fs-space-2); }
-	.fs-ap-bgrow .btn { flex: 1; font-size: var(--fs-type); padding: var(--fs-space-2) var(--fs-space-2-5); cursor: pointer; }
-	.fs-ap-bgrow .btn:disabled { cursor: default; }
-	/* an explicit `display` DEFEATS the `hidden` attribute (the UA's `[hidden]{display:none}` is a
-	 * bare 0,0,1 rule these out-rank), so the JS's panel.hidden / preview.hidden / removeBtn.hidden
-	 * would not hide the panel for Off/Cats, the empty preview, or a not-yet-uploaded Remove. Restate
-	 * hidden at a specificity that wins. */
-	.fs-ap-bg[hidden], .fs-ap-bgprev[hidden], .fs-ap-bgrow .btn[hidden] { display: none; }
-	/* Under the File wallpaper only the photo Dim is relevant — the router-identity Tint colours the
-	 * canvas the photo covers, so hide the Tint hue AND its Density there (fs-ap-tint marks both). */
-	:root[data-wallpaper="file"] .fs-ap-tint { display: none; }
-	/* and the Density is meaningless with no hue set, so hide it whenever the Tint is off. (0,3,0)
-	 * out-ranks .fs-ap-group's own display. */
-	:root:not([data-tint]) .fs-ap-density { display: none; }
-
-	/* version line + "new version" pill + Update button at the foot of the popover */
-	.fs-ap-footer {
-		display: flex; flex-direction: column; gap: var(--fs-space-2);
-		margin-top: var(--fs-space-0-5); padding-top: var(--fs-space-2-5); border-top: 1px solid var(--fs-border);
-	}
-	.fs-ap-verrow { display: flex; align-items: center; justify-content: space-between; gap: var(--fs-space-2-5); }
-	/* links to the project repo — reads as muted text until hovered */
-	.fs-ap-version { font-size: var(--fs-type-xs); color: var(--fs-dim); font-variant-numeric: tabular-nums; text-decoration: none; }
-	.fs-ap-version:hover { color: var(--fs-accent); text-decoration: underline; }
-	.fs-ap-update {
-		display: block; width: 100%; padding: var(--fs-space-2) var(--fs-space-3);
-		font-size: var(--fs-type); font-weight: var(--fs-weight); cursor: pointer;
-		color: var(--fs-on-good); background: var(--fs-good);
-		border: 1px solid transparent; border-radius: var(--fs-radius);
-		transition: filter var(--fs-dur);
-	}
-	.fs-ap-update:hover { filter: var(--fs-hover-lift); }
-	.fs-ap-update[hidden] { display: none; }
-	.fs-ap-badge {
-		font-size: var(--fs-type-xs); font-weight: var(--fs-weight); white-space: nowrap; text-decoration: none;
-		color: var(--fs-good); padding: var(--fs-space-0-5) var(--fs-space-2); border-radius: var(--fs-radius-pill);
-		background: var(--fs-panel2);	/* opaque: a self-tint eats its own contrast — see theme/35-alerts.css */
-		border: 1px solid var(--fs-good-line);
-	}
-	.fs-ap-badge[hidden] { display: none; }
-	.fs-ap-badge:hover { filter: var(--fs-hover-lift); }
-
-	/* the one-click Update confirm dialog (a ui.showModal, not this popover): the version step, an
-	 * optional breaking-change banner (.alert-message.warning, already styled), and the release notes
-	 * as scrollable preformatted text. The notes are untrusted (rendered as a text node) — see
-	 * fs-update.js fetchNotes; the box only frames them. */
-	.fs-ap-upd-head { font-size: var(--fs-type-lg); font-weight: var(--fs-weight-bold); font-variant-numeric: tabular-nums; margin: 0 0 var(--fs-space-2); }
-	.fs-ap-upd-warn { margin-bottom: var(--fs-space-2-5); }
-	.fs-ap-upd-noteshead { font-size: var(--fs-type-xs); font-weight: var(--fs-weight); color: var(--fs-dim); margin: var(--fs-space-2-5) 0 var(--fs-space-1); }
-	.fs-ap-upd-notes {
-		max-height: 40vh; overflow: auto; margin: 0;
-		padding: var(--fs-space-2-5) var(--fs-space-3); border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
-		background: var(--fs-panel2); color: var(--fs-text);
-		font-size: var(--fs-type); line-height: var(--fs-leading); white-space: pre-wrap; overflow-wrap: anywhere;
-	}
-
-	/* update indicator: a green dot on the Appearance trigger, added by
-	 * fs-appearance.js (.fs-has-update) when fs-update finds a newer release. The panel-coloured ring lifts
-	 * it off the icon. */
-	#fs-appearance { position: relative; overflow: visible; }
-	#fs-appearance.fs-has-update::after {
-		content: ""; position: absolute; top: 3px; right: 3px;
-		width: 8px; height: 8px; border-radius: 50%;
-		background: var(--fs-good); box-shadow: 0 0 0 2px var(--fs-panel);
-	}
-	.fs-seg {
-		display: flex; gap: var(--fs-space-1); padding: var(--fs-space-1);
-		background: var(--fs-panel2); border: 1px solid var(--fs-border); border-radius: var(--fs-radius);
-	}
-	.fs-seg button {
-		flex: 1; padding: var(--fs-space-1-5) var(--fs-space-2); border: 0; border-radius: var(--fs-radius-sm);
-		background: transparent; color: var(--fs-dim);
-		font: inherit; font-size: var(--fs-type); font-weight: var(--fs-weight); line-height: 1.2;
-		cursor: pointer; white-space: nowrap; transition: background var(--fs-dur), color var(--fs-dur);
-	}
-	.fs-seg button:hover { color: var(--fs-text); }
-	.fs-seg button.active { background: var(--fs-accent); color: var(--fs-on-accent); }
-
-	/* Rounding axis = a range slider + live px readout; track/thumb styled on both the WebKit
-	 * and the Firefox pseudo-elements. Written as `input[type="range"].fs-range` on purpose:
-	 * the generic `input[type="range"]` rule in theme/60-inputs.css is (0,1,1) and later in
-	 * the cascade, so a bare `.fs-range` (0,1,0) silently lost every declaration here and the
-	 * popover rendered the generic 6px/16px slider. */
-	.fs-rangewrap { display: flex; align-items: center; gap: var(--fs-space-2-5); }
-	input[type="range"].fs-range {
-		flex: 1 1 auto; min-width: 0; height: 4px; margin: var(--fs-space-1-5) 0;
-		-webkit-appearance: none; appearance: none;
-		background: var(--fs-track); border-radius: var(--fs-radius-pill); cursor: pointer;
-	}
-	/* Thumb is 16px like the generic slider's (theme/60-inputs.css) — same accent circle,
-	 * same 2px panel border; only the TRACK is slimmer here (4px, popover density). It said
-	 * 15px, an off-by-1 nobody chose. */
-	input[type="range"].fs-range::-webkit-slider-thumb {
-		-webkit-appearance: none; appearance: none;
-		width: 16px; height: 16px; border-radius: 50%;
-		background: var(--fs-accent); border: 2px solid var(--fs-panel); box-shadow: var(--fs-shadow);
-	}
-	input[type="range"].fs-range::-moz-range-thumb {
-		width: 16px; height: 16px; border-radius: 50%;
-		background: var(--fs-accent); border: 2px solid var(--fs-panel); box-shadow: var(--fs-shadow);
-	}
-	input[type="range"].fs-range::-moz-range-track {
-		height: 4px; background: var(--fs-track); border-radius: var(--fs-radius-pill);
-	}
-	input[type="range"].fs-range:focus-visible { outline: none; box-shadow: var(--fs-focus-ring); }
-	.fs-range-val {
-		flex: 0 0 auto; min-width: 34px; text-align: right;
-		font-size: var(--fs-type-xs); font-weight: var(--fs-weight); color: var(--fs-dim); font-variant-numeric: tabular-nums;
-	}
-
-	/* Tint axis — the same slider, but the track IS the value: a hue wheel laid flat, so the
-	 * control shows what it picks before it is dragged (a grey track under a "215°" readout means
-	 * nothing). The stops are the wheel's six primaries at fixed lightness/chroma; the browser
-	 * interpolates, so the pixel under the thumb is roughly the hue it selects.
-	 *
-	 * The gradient goes into an element-scoped local because Firefox paints the TRACK
-	 * pseudo-element over the input's own background — the same image must be declared twice, and
-	 * two copies of a seven-stop gradient are two things to drift.
-	 *
-	 * Position 0 (= off) still shows red, not a grey notch: the readout says "Off" and the
-	 * surfaces are visibly untinted, and a notch would cost a stop the interpolation reads as a
-	 * hue. */
-	input[type="range"].fs-range-hue {
-		--fs-hue-track: linear-gradient(to right,
-			oklch(.72 .17 0), oklch(.72 .17 60), oklch(.72 .17 120),
-			oklch(.72 .17 180), oklch(.72 .17 240), oklch(.72 .17 300), oklch(.72 .17 360));
-		background: var(--fs-hue-track);
-	}
-	input[type="range"].fs-range-hue::-moz-range-track { background: var(--fs-hue-track); }
-	/* the thumb carries the CHOSEN hue while the tint is on — the one place in the popover
-	 * showing the raw colour rather than the wash it produces. :not() so the shared rainbow
-	 * track class doesn't hijack the accent slider's thumb below. */
-	:root[data-tint] input[type="range"].fs-range-hue:not(.fs-range-accent)::-webkit-slider-thumb {
-		background: oklch(.65 .17 var(--fs-tint-h));
-	}
-	:root[data-tint] input[type="range"].fs-range-hue:not(.fs-range-accent)::-moz-range-thumb {
-		background: oklch(.65 .17 var(--fs-tint-h));
-	}
-	/* the accent slider reuses the rainbow track; its thumb shows the chosen accent hue */
-	:root[data-accent] input[type="range"].fs-range-accent::-webkit-slider-thumb {
-		background: oklch(.65 .17 var(--fs-accent-h));
-	}
-	:root[data-accent] input[type="range"].fs-range-accent::-moz-range-thumb {
-		background: oklch(.65 .17 var(--fs-accent-h));
-	}
+	/* THE APPEARANCE CONTROLS USED TO LIVE HERE, as a popover on <body> plus the segmented and
+	 * slider controls it was built from. They are a PAGE now (System -> Appearance) and their CSS
+	 * moved with them, to styles/pages/80-appearance.css — a page's styles belong in the page layer,
+	 * and the shell no longer draws any of it. */
 
 	/* ==================================================================
 	 * Collapsed sidebar (icon rail) — <html data-rail="true">, persisted in localStorage and
@@ -627,7 +466,7 @@
 		}
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-brandrow { flex-direction: column; gap: var(--fs-space-2-5); padding: 0 0 var(--fs-space-5); }
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-brand { flex: 0 0 auto; justify-content: center; }
-		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-railtoggle .fs-ico { transform: rotate(180deg); }
+		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-railtoggle .fs-ico { rotate: 180deg; }
 
 		/* only the rail's own labels collapse — a `.fs-label` also exists on every
 		 * submenu link, and those live inside the flyout where they must stay */
@@ -656,8 +495,8 @@
 		/* leaf sections have no flyout — show their name as a tooltip bubble */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li:not(.has-sub) > a::after {
 			content: attr(data-label);
-			position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
-			margin-left: var(--fs-space-2-5); z-index: var(--fs-z-flyout);
+			position: absolute; inset-inline-start: 100%; top: 50%; transform: translateY(-50%);
+			margin-inline-start: var(--fs-space-2-5); z-index: var(--fs-z-flyout);
 			padding: var(--fs-space-1-5) var(--fs-space-2-5); border-radius: var(--fs-radius-sm);
 			background: var(--fs-panel); border: 1px solid var(--fs-border);
 			box-shadow: var(--fs-shadow-pop);
@@ -672,7 +511,7 @@
 		 * tap-to-close. */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub > ul {
 			display: none;
-			position: absolute; left: 100%; top: -8px; margin: 0 0 0 var(--fs-space-2-5);
+			position: absolute; inset-inline-start: 100%; top: -8px; margin: 0; margin-inline-start: var(--fs-space-2-5);
 			min-width: 196px; padding: var(--fs-space-2); z-index: var(--fs-z-flyout);
 			background: var(--fs-panel); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-lg);
 			box-shadow: var(--fs-shadow-pop);
@@ -682,16 +521,26 @@
 		@media (hover: hover) {
 			:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub:hover > ul { display: flex; }
 		}
-		/* the flyout's heading, so the collapsed icon still names its section */
+		/* the flyout's heading, so the collapsed icon still names its section.
+		 *
+		 * IT MUST UNDO THE BAR'S HOVER BRIDGE, and forgetting to was issue #22. This same
+		 * ::before is the bar's invisible 10px hover bridge above the panel (the unguarded rule
+		 * near the top of this file): `position: absolute; left: 0; right: 0; top: -10px;
+		 * height: 10px`. Re-pointing `content` at the title left all four of those in force, so
+		 * the heading rendered as a 10px-tall absolute box ten pixels ABOVE the flyout — out of
+		 * the flow, and clipped in half by the panel's own `overflow: hidden` (measured:
+		 * `top: -10px`, `height: 12px`, and the top of every letter cut off). The rail brings its
+		 * own bridge as `li.has-sub::after`, so nothing here needs the bar's. */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li > ul[data-title]::before {
 			content: attr(data-title);
+			position: static; inset: auto; height: auto;
 			padding: var(--fs-space-1) var(--fs-space-3) var(--fs-space-2);
 			color: var(--fs-eyebrow-color); font-size: var(--fs-type-xs); font-weight: var(--fs-eyebrow-weight);
 			letter-spacing: var(--fs-eyebrow-tracking); text-transform: uppercase;
 		}
 		/* bridge the 10px gap so the pointer can travel icon -> flyout without a hover drop */
 		:root[data-layout="sidebar"]:not([data-narrow])[data-rail="true"] .fs-sidebar ul.nav > li.has-sub::after {
-			content: ""; position: absolute; left: 100%; top: 0;
+			content: ""; position: absolute; inset-inline-start: 100%; top: 0;
 			width: 12px; height: 100%;
 		}
 
@@ -825,7 +674,7 @@
 	 * those top-level alerts and any inside #view. */
 	@media (max-width: 767px) {
 		.fs-main .alert-message { flex-wrap: wrap; }
-		.fs-main .alert-message > * { min-width: 0; margin-left: 0; }
+		.fs-main .alert-message > * { min-width: 0; margin-inline-start: 0; }
 		/* the action row is a nested flex that stayed nowrap, so the first button's label got
 		 * clipped when Dismiss sat beside it. Wrap the inner rows; let labels break. */
 		.fs-main .alert-message div { flex-wrap: wrap; min-width: 0; }

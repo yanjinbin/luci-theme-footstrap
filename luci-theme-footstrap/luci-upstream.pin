@@ -3,7 +3,7 @@
 #
 # Both are downloaded over the network and then EXECUTED as gates:
 #   - jsmin.c       compiled; decides whether our shipped JS is safe (its regex-vs-division
-#                   lookback can silently eat a file — see CLAUDE.md)
+#                   lookback can silently eat a file — see docs/conventions.md)
 #   - i18n-scan.pl  run by perl; decides whether the translation catalogue is complete
 # Off a moving `master`, the gate would be whatever upstream pushed last.
 #
@@ -16,17 +16,17 @@ LUCI_PIN=5cf20c5741dc34eea0faaf7324ef3751b05fa1f3
 JSMIN_SHA256=0568b14873f27f339cf66a9c43603d0bc8ca501ff62522ea924c6e8daf1be215
 I18N_SCAN_SHA256=a1823d1fdd942f31a105e1e53b401e146bc10527f231e016930b1a5123ef21d3
 
-# The ucode interpreter, built in CI to COMPILE-CHECK the theme's .ut templates — the same
-# class of borrowed, executed tool, so it is pinned in the same place.
+# THERE IS NO UCODE PIN, AND THAT IS DELIBERATE — do not add one back.
 #
-# Why it exists: templates are copied to the router verbatim and never parsed at build time,
-# so a stray brace in header.ut builds green, releases, and then every user's LuCI silently
-# falls back to another theme (docs/01). Nothing else here catches that — sh -n covers the
-# shell, eslint the JS, stylelint the CSS, and the .ut files had no parser at all.
+# The theme's .ut templates still have to be compile-checked: they are copied to the router
+# verbatim and never parsed at build time, so a stray brace in header.ut builds green, releases,
+# and then every user's LuCI silently falls back to another theme (docs/architecture.md).
 #
-# Pinned by COMMIT, not by a tarball sha256: a git object name IS the checksum of its content,
-# and GitHub's generated archives are not guaranteed byte-stable. (= tag v0.0.20250529.)
-UCODE_PIN=be92ebd706339fd4a848b88ee516b1ac4eb62ef8
+# That check used to live here — clone ucode at a pinned commit, build it with cmake, run
+# `ucode -T -c` with the router runtime stubbed out through `-L`. It is now the fifth assertion
+# of the `verify` job (docs/ci.md), which runs the router's OWN interpreter against the INSTALLED
+# templates, on both release lines. Nothing to pin, nothing to build, nothing stubbed — and it
+# checks the interpreter each branch actually ships rather than one commit for both.
 
 # usign — OpenWrt's ed25519 signer. CI builds it to SIGN each release package; the router
 # verifies with the /usr/bin/usign it already has (base-files depends on usign, so it is on
@@ -46,7 +46,7 @@ USIGN_PIN=c4c72b1b07945ee192361dc751291a7c98d6adcd
 # toolchain that compiles the released artifact arrived on nothing but TLS.
 #
 # The sha256 next to the tarball cannot fix that, and the reason is this project's own argument
-# against GitHub's asset digest (CLAUDE.md): `sha256sums` is served by the SAME host, from the SAME
+# against GitHub's asset digest (docs/conventions.md): `sha256sums` is served by the SAME host, from the SAME
 # directory, unsigned — whoever can replace openwrt-sdk-*.tar.zst can replace the checksum beside it,
 # and the check then verifies the attacker's SDK. It is worth keeping for a truncated download; it is
 # not a verification, and the comment in build.yml used to say it was.
@@ -60,13 +60,22 @@ USIGN_PIN=c4c72b1b07945ee192361dc751291a7c98d6adcd
 # mirror's own. To bump: change the commit and re-fetch every key it serves, then update their
 # sha256s — the sha256 is what actually holds the content, exactly as for jsmin.c.
 #
-# Only the COMMIT is here. WHICH key is a property of the branch, not of this file, and the two
-# branches do not share one: 24.10 has a release key of its own (d310c6f2833e97f7) while 25.12 is
-# signed by the unattended-build key (b5043e70f9a75cde). So each leg names its own in build.yml's
-# matrix, beside its channel. Pinning one key for both was wrong in the only way it could be — the
-# 24.10 leg refused to build, which is the gate doing its job on its author.
+# The two branches do NOT share a key: 24.10 has a release key of its own while 25.12 is signed by
+# the unattended-build key. Pinning one for both was wrong in the only way it could be — the 24.10
+# leg refused to build, which is the gate doing its job on its author.
+#
+# Both live here now. They used to sit in .github/workflows/build.yml's matrix, beside the channel
+# they are a property of; that matrix went away with the SDK build (the release is built by owfeed,
+# which fetches and verifies its own host apk). build-apk.sh — the local SDK build, the one path
+# that still needs them — read them out of that file, so leaving them there would have left a
+# convenience script parsing a matrix that no longer exists.
 #
 # The key id IS the file name in the keyring, and it is the keynum usign embeds in the signature. If
-# a build ever comes back "verification failed", read that keynum first (the step prints it): OpenWrt
-# rotating a branch's key looks exactly like an attack.
+# a build ever comes back "verification failed", read that keynum first (the script prints it):
+# OpenWrt rotating a branch's key looks exactly like an attack. The sha256 is what actually holds
+# the content — the id only says which file to fetch.
 OPENWRT_KEYRING_PIN=fbae29d730f81c892f52e0ff00fe867444aeeae6
+OPENWRT_SDK_KEY_2512=b5043e70f9a75cde
+OPENWRT_SDK_KEY_2512_SHA256=d7ac10f9ed1b38033855f3d27c9327d558444fca804c685b17d9dcfb0648228f
+OPENWRT_SDK_KEY_2410=d310c6f2833e97f7
+OPENWRT_SDK_KEY_2410_SHA256=e3624aa9be785362a172595b4919b233268871c4365a9b8da2b42ac41745ad95

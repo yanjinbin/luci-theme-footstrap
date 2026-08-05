@@ -18,11 +18,7 @@ import { utProcessor } from './tools/lib/ut-scripts.mjs';
  * `'require ui'` with no alias binds the bare name and is already a global below; only the aliased
  * form needs deriving. See the config entry at the bottom for why this is read from the source rather
  * than written out.
- *
- * The optional updater (fs-update.js) moved to its own repo (VizzleTF/luci-app-footstrap-updater),
- * which lints and jsmin-checks it there; it still lands in this same /www/luci-static/resources dir on
- * the router and requires the theme's fs-version/fs-prefs/fs-router at runtime, but its source is no
- * longer here to lint. */
+ */
 const HTDOCS_GLOBS = [
 	'luci-theme-footstrap/htdocs/**/*.js',
 ];
@@ -66,6 +62,11 @@ export default [
 				_: 'readonly',
 				baseclass: 'readonly',
 				ui: 'readonly',
+				/* the base class every LuCI VIEW extends. Bound by a bare `'require view'`, like the
+				 * rest of this list. The theme ships no view of its own — its axes are a tab
+				 * appended to the stock System -> System page — so this is here for a module that
+				 * composes with one. */
+				view: 'readonly',
 				dom: 'readonly',
 				fs: 'readonly',
 				uci: 'readonly',
@@ -107,7 +108,7 @@ export default [
 			'no-template-curly-in-string': 'warn',
 			'require-atomic-updates': 'warn',
 
-			/* the theme's own house rules, from CLAUDE.md */
+			/* the theme's own house rules, from docs/conventions.md */
 			'no-alert': 'error',
 			'no-console': ['warn', { allow: ['warn', 'error'] }],
 

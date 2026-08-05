@@ -1,7 +1,7 @@
 #!/bin/sh
-# Залить тему footstrap на роутер (ssh router).
-# ОДНА тема, одна запись в luci.themes; раскладка (sidebar/top) — клиентская
-# настройка в поповере Appearance, а не запись темы. Регистрирует, НЕ активирует.
+# Push the footstrap theme to a HARDWARE router over ssh (containers use owlab).
+# ONE theme, one luci.themes entry; layout (top/sidebar) is a client axis on the Footstrap tab of
+# System -> System, not a theme entry. This registers the theme; it does NOT activate it.
 set -e
 
 R="${1:-router2512}"
@@ -13,7 +13,8 @@ D="$(cd "$(dirname "$0")" && pwd)"
 "$D"/build-css.sh "$D/htdocs/luci-static/$N/cascade.css" --dev
 
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N \
-	/www/luci-static/$N"
+	/www/luci-static/$N \
+"
 
 # the ONE template (+ partials/). Sidebar and top bar are the same markup, morphed by
 # :root[data-layout] — there is no second theme dir to copy.
@@ -21,18 +22,24 @@ scp -q  "$D"/ucode/template/themes/$N/*.ut      "$R":/usr/share/ucode/luci/templ
 ssh "$R" "mkdir -p /usr/share/ucode/luci/template/themes/$N/partials"
 scp -q  "$D"/ucode/template/themes/$N/partials/*.ut "$R":/usr/share/ucode/luci/template/themes/$N/partials/
 
-# shared static (cascade.css, fonts, logo)
+# shared static (cascade.css, fonts, logo). The doodle wallpapers are NOT here and not in the
+# package: they are downloaded on demand from GitHub (fs-prefs.js installWallpaper), so the dev
+# router deliberately starts without them — that is the state to test the download dialog in.
 scp -qr "$D"/htdocs/luci-static/$N/* "$R":/www/luci-static/$N/
 
 # EVERY resource JS, by GLOB — never by name. This used to list the four files
 # individually, so a FIFTH would be shipped by the package (luci.mk copies htdocs/
 # wholesale) yet silently never reach the dev router — first tested after a release.
-scp -q  "$D"/htdocs/luci-static/resources/*.js "$R":/www/luci-static/resources/
+#
+# A TAR OF THE TREE, not `scp *.js`: the flat glob does not descend, so anything a subdirectory
+# holds shipped in the package (luci.mk copies htdocs/ wholesale) and reached the dev router never —
+# the same class of miss the glob above was written to end, one directory level down. Every path
+# under resources/ is ours to place.
+tar -C "$D/htdocs/luci-static/resources" -cf - . | ssh "$R" "mkdir -p /www/luci-static/resources && tar -C /www/luci-static/resources -xf -"
 
 # stamp the git-derived version into the deployed fs-version.js (the package does the same in
-# Build/Prepare) so the popover shows a real version and the updater's check compares against it. The
-# FILE NAME is part of the contract: FS_VERSION lives in fs-version.js and moving it means changing
-# both seds.
+# Build/Prepare) so the Footstrap tab shows a real version instead of "(dev)". The FILE NAME is part
+# of the contract: FS_VERSION lives in fs-version.js and moving it means changing every sed.
 FS_V="$(git -C "$D" describe --tags --always 2>/dev/null | sed 's/^v//')"
 # if-form, not `[ -n ] && ssh`: under set -e a failed &&-list aborts the whole sync when git
 # describe yields nothing (a copied tree without .git). expr refuses a tag with
@@ -47,7 +54,7 @@ fi
 # po2lmo.c lib/lmo.c lib/plural_formula.c.) Same basename as the package — see the Makefile.
 if command -v po2lmo >/dev/null 2>&1; then
 	ssh "$R" "mkdir -p /usr/lib/lua/luci/i18n"
-	for po in "$D"/i18n/*/*.po; do
+	for po in "$D"/po/*/*.po; do
 		[ -e "$po" ] || continue
 		lang="$(basename "$(dirname "$po")")"
 		po2lmo "$po" "/tmp/footstrap-theme.$lang.lmo"
@@ -84,10 +91,8 @@ for _f in "$D"/root/etc/config/*; do
 	scp -q "$_f" "$R":"/tmp/.fs-conf-$_b"
 	ssh "$R" "[ -f /etc/config/$_b ] || { mv /tmp/.fs-conf-$_b /etc/config/$_b; echo '  installed /etc/config/$_b (was absent)'; }; rm -f /tmp/.fs-conf-$_b"
 done
-# The self-update backend, its ACL and the release key now ship in the SEPARATE
-# luci-app-footstrap-updater package — deploy them with that package's own dev-sync.sh. This theme
-# sync intentionally leaves the router in the "updater not installed" state (version shows, no update
-# controls), which is exactly the state to test here.
+# There is no self-update backend to deploy any more: the theme upgrades through the package feed
+# the installer adds, which is what a package manager is for.
 ssh "$R" "/etc/init.d/rpcd reload 2>/dev/null; rm -f /tmp/luci-indexcache*"
 
 ssh "$R" "
@@ -103,6 +108,11 @@ cd /www/luci-static
 rm -rf $N/$N $N-top $N-dark $N-light $N-top-dark $N-top-light
 cd /usr/share/ucode/luci/template/themes
 rm -rf $N/$N $N-top $N-dark $N-light $N-top-dark $N-top-light
+# The overview layout used to install into luci-mod-status's GLOBAL include dir, where LuCI loads
+# every *.js under any theme. It is a chrome module (fs-overview.js) now. A package upgrade drops
+# the old file; dev-sync copies rather than installs, so it has to be swept by name — otherwise the
+# dev router keeps running BOTH copies and the grid is arranged twice.
+rm -f /www/luci-static/resources/view/status/include/05_footstrap_overview_layout.js
 for db in /lib/apk/db/installed /usr/lib/opkg/status; do [ -f \"\$db\" ] && touch \"\$db\"; done
 rm -f /tmp/luci-indexcache*"
 

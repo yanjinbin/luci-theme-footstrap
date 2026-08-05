@@ -43,9 +43,11 @@
 		border: 0; border-radius: 0; overflow: visible; background: none;
 	}
 	.cbi-section .table { margin: 0; width: 100%; }
-	/* A data table straight in #view (no section: package-manager, Startup) misses the width
-	 * above, so it sized to preferred width and overflowed the content column. */
-	#view .table[id], table.fs-dt { width: 100%; }
+	/* A data table straight in #view (no section: package-manager, Startup) misses the width above,
+	 * so it sized to preferred width and overflowed the content column — which base already fixes
+	 * for EVERY `.table` (`width: 100%`, base/40-tables.css), and has for as long as both rules have
+	 * existed. Switched off against the 24 tables that match it across eight pages: no computed
+	 * style moved, so the rule only restated a value one layer down. Removed. */
 	/* Config-table fields fill their cell — moved from base with the generic field box in
 	 * theme/60-inputs.css (in base these beat its 210px in-layer; left behind they would lose
 	 * to it by layer), together with the numeric-cell refinement below them. */
@@ -80,21 +82,26 @@
 		text-overflow: ellipsis;
 	}
 	/* width:100% cannot shrink a table below min-content — one long unbreakable value holds the
-	 * floor. Breaking values reflows it into the ~984px column instead of scrolling. DHCP leases
-	 * need finer control (only DUID/IPv6 may break, not IPv4/MAC): pages/50-leases.css. */
-	#view .table[id] .td, table.fs-dt .td { overflow-wrap: anywhere; }
+	 * floor. Breaking values reflows it into the ~984px column instead of scrolling. That break is
+	 * now the DEFAULT for every cell (base/40-tables.css), so the copy that used to sit here —
+	 * `#view .table[id] .td, table.fs-dt .td { overflow-wrap: anywhere }` — said nothing the
+	 * cascade did not already say: switched off against 1941 matching cells across eight pages at
+	 * three widths, not one computed style moved. It is gone rather than kept "for clarity",
+	 * because a second copy of a value is the drift this sheet is written to avoid. DHCP leases
+	 * still need finer control (only DUID/IPv6 may break, not IPv4/MAC) and get it from
+	 * `white-space: nowrap`, not from this property: pages/50-leases.css. */
 	.cbi-section .table .td,
 	.cbi-section .table .th {
 		padding: var(--fs-space-2-5) var(--fs-space-4) var(--fs-space-2-5) 0;
 		border: 0; border-bottom: 1px solid var(--fs-border);
 		line-height: 1.45; vertical-align: middle;
-		text-align: left;
+		text-align: start;
 	}
-	/* Row actions hug the right. Base says so too but loses to the `text-align: left` above (an
+	/* Row actions hug the far edge. Base says so too but loses to the `text-align: start` above (an
 	 * earlier layer), so restate it. `.cbi-section-table-cell` is the discriminator:
 	 * form.TableSection's action cells carry it (firewall zones, port forwards); the hand-built
 	 * ones of Wireless (`.td.middle`) and DHCP leases do not, and stay left. */
-	.cbi-section .table .td.cbi-section-table-cell.cbi-section-actions { text-align: right; }
+	.cbi-section .table .td.cbi-section-table-cell.cbi-section-actions { text-align: end; }
 	.cbi-section .table .tr:last-child .td { border-bottom: 0; }
 	.cbi-section .table .th {
 		color: var(--fs-eyebrow-color); font-weight: var(--fs-eyebrow-weight); font-size: var(--fs-type-xs);
@@ -154,7 +161,7 @@
 	.cbi-section .table[id] .tr.placeholder .td,
 	#view .table[id] .tr.placeholder .td,
 	table.fs-dt .tr.placeholder .td {
-		display: block; width: 100%; text-align: left;
+		display: block; width: 100%; text-align: start;
 		color: var(--fs-dim); font-family: var(--fs-font-sans);
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
 	}
@@ -172,7 +179,7 @@
 		color: var(--fs-dim); font-weight: var(--fs-weight); width: 40%; white-space: nowrap;
 	}
 	.cbi-section .table:not([id]):not(.cbi-section-table):not(.fs-dt):not(:has(.tr.table-titles)):not([style*="table-layout"]) .td:last-child:not(:first-child) {
-		font-family: var(--fs-font-mono); color: var(--fs-text); text-align: right;
+		font-family: var(--fs-font-mono); color: var(--fs-text); text-align: end;
 	}
 
 	/* --- The realtime graph legend (status/realtime/{bandwidth,connections,load,wireless}) ---
@@ -402,7 +409,7 @@
 	.table.fs-stacked .tr { display: flex; flex-wrap: wrap; }
 	.table.fs-stacked .td {
 		display: block; min-width: 0; width: auto;
-		padding: var(--fs-space-1-5) var(--fs-space-2-5) var(--fs-space-1-5) 0; border: 0; text-align: left;
+		padding-block: var(--fs-space-1-5); padding-inline: 0 var(--fs-space-2-5); border: 0; text-align: start;
 		overflow-wrap: anywhere; white-space: normal;
 	}
 	/* The column label, lifted above its value (LuCI writes it per cell as data-title).

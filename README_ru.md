@@ -3,79 +3,69 @@
 [English](README.md) · **Русский** ·
 **[Песочница — всё можно потрогать без роутера](https://vizzletf.github.io/luci-theme-footstrap/playground.html)**
 
-<img src="assets/readme/overview-top-dark.png" width="100%" alt="Тот же обзор в тёмной теме с верхней панелью: меню стоит в строке бренда, контент идёт во всю ширину.">
+[![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap.json)](https://owfeed.org/install/ru/)
+[![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap-releases.json)](https://owfeed.org/install/ru/)
+
+Тема LuCI для OpenWrt 24.10 и новее. Без фреймворка, единственная зависимость — `luci-base`.
+
+<picture>
+  <source media="(max-width: 767px)" srcset="assets/readme/phone-menu-dark.png">
+  <img src="assets/readme/overview-top-dark.png" width="100%" alt="Тот же обзор в тёмной теме с верхней панелью: меню стоит в строке бренда, контент идёт во всю ширину.">
+</picture>
+
+<details>
+<summary>Настройки внешнего вида</summary>
+
+<img src="assets/readme/appearance-dark.png" width="100%" alt="Вкладка Footstrap в «Система → Система»: раскладка, тема, палитра, плотность и скругление; поля цвета для акцента, статусов и поверхностей — каждое со словесной оценкой контраста; выбор обоев с котами на фоне страницы; и «Сохранить как умолчание» рядом с двумя сбросами.">
+
+</details>
+
+## Установка
+
+```sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+```
+
+Скрипт добавляет свой фид пакетов и ставит тему из него. Дальше тема обновляется вместе с роутером:
+`apk update && apk upgrade` (или `opkg`).
+
+После этого выберите **Footstrap** в **System → System → Language and Style**, поле «Design».
 
 [Ещё скриншоты →](docs/screenshots/)
 
 ## Что умеет
 
-<br clear="left">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/appearance-dark.png">
-  <img align="right" width="279" src="assets/readme/appearance-light.png" alt="Попап Appearance: раскладка, тема, палитра, плотность, обои, оттенок, акцент, скругление, подменю, обновления и Save/Reset как умолчание роутера.">
-</picture>
-
-### Стилизует приложения, а не только стоковые страницы.
-
-### Работает на телефоне.
-
-### Лёгкая.
-
-### Быстрее bootstrap
-
-### Умеет обновляться сама.
-
-### Свои настройки внешнего вида.
-
-
-На роутере вы один раз выбираете **Footstrap** в **System → System → Language and Style**. Каждая ось
-справа — настройка *браузера*: применяется сразу, без перезагрузки страницы.
-
-- **Layout** — боковое меню или верхняя панель
-- **Theme** — auto (следит за системой), светлая или тёмная
-- **Palette** — Footstrap (цвета GitHub Primer) или Hi-Contrast
-- **Density** — компактная, обычная или крупная
-- **Wallpaper** — выключены, коты или своя картинка
-- **Tint** — подмешивает оттенок в фон, чтобы понимать, какому роутеру принадлежит вкладка (или
-  скриншот в тикете)
-- **Accent** — перекрашивает кнопки, тумблеры, ползунки и кольца фокуса
-- **Rounding** — радиус скругления, 0–20px
-- **Submenus** — держать несколько разделов меню открытыми или сворачивать до одного
-
-Понравившийся набор можно сохранить умолчанием для роутера — новый браузер начнёт с него.
-<br clear="right">
-
+- **Стилизует любую страницу, стоковую и нет** — но не перебивает то, что приложение красит само
+- **Работает на телефоне**
+- **Быстрее bootstrap** — цифры ниже
+- **Обновляется вместе с роутером**, из фида пакетов
+- **Восемнадцать осей внешнего вида**, применяются сразу, всё в одной вкладке
 
 ## Замерено, а не заявлено
 
-<br clear="right">
-<img src="assets/readme/speed.svg" width="720" alt="Замер: Wireless status 288 мс → 16 мс, Interfaces 367 → 63, DNS 328 → 84, Firewall zones 300 → 88. Весь прогон из 36 страниц 7458 → 3196 мс, в 2.33 раза; медианная страница в 3.04 раза; запросов на страницу 15–48 → 0–8.">
+Время до первой отрисовки, тот же роутер, те же страницы.
 
-<br clear="right">
+| Страница | bootstrap | footstrap |
+|---|---:|---:|
+| Wireless status | 271 мс | **54 мс** |
+| Interfaces | 374 мс | **111 мс** |
+| DNS | 329 мс | **108 мс** |
+| Firewall zones | 311 мс | **79 мс** |
+| Прогон 38 страниц | 11 306 мс | **4933 мс** |
+| Запросов/стр. | 15–47 | **0–7** |
 
-## Установка
+Медианная страница — **в 3.03 раза быстрее**, весь прогон — **в 2.29 раза**. Процессорное время
+роутера на тот же обход: 37.3 с против **18.4 с**. Замерено на железе, пять прогонов; методика и
+полные данные — [docs/benchmark.md](docs/benchmark.md).
 
-<br clear="right">
+## Документация
 
-```sh
-wget -qO- https://raw.githubusercontent.com/VizzleTF/luci-theme-footstrap/main/install.sh | sh
-```
+Документация для разработчика — в **[docs/](docs/README.md)**: архитектура, дизайн-система, сборка
+стилей, SPA-роутер, упаковка, релизный ранбук. Она **на английском**; на русском остаются только
+этот README и `CHANGELOG_ru.md`. Начните с [architecture.md](docs/architecture.md) — что такое
+тема, — или с [conventions.md](docs/conventions.md) — правила, которым обязана следовать правка.
 
-Дальше выберите **Footstrap** в **System → System → Language and Style**, поле «Design». Это
-единственное, что задаётся на роутере. Нужна конкретная версия — добавьте тег: `... | sh -s v0.9.0`.
-
-<br clear="right">
-
-## Пишете luci-app?
-
-<br clear="right">
-
-
-В [devkit для разработчиков](https://vizzletf.github.io/luci-theme-footstrap/) — сетка цветовых
-токенов, разметка компонентов и проверялка стилей, куда можно вставить свой CSS.
-
-Есть и текстовое руководство:
-[как стилизовать приложение LuCI, чтобы оно работало под любой темой](docs/20-luci-app-styling-guide.ru.md)
-— время жизни CSS, неймспейсы, цветовой контракт, детект тёмной темы и что делает эта тема, когда
-приложение нарушает правила. Собрано по 30 реальным приложениям и проверено на роутере.
+Пишете `luci-app`? Прочитайте,
+[как стилизовать его, чтобы он работал под любой темой](docs/luci-app-styling-guide_ru.md), и
+вставьте свой CSS в [devkit](https://vizzletf.github.io/luci-theme-footstrap/) — сетка токенов,
+разметка компонентов, проверялка стилей.

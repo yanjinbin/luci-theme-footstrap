@@ -114,7 +114,7 @@
 		position: absolute;
 		align-items: center;
 		top: -1px;
-		right: -1px;
+		inset-inline-end: -1px;
 		bottom: -1px;
 		font-weight: var(--fs-weight-bold);
 		pointer-events: auto;
@@ -233,13 +233,21 @@
 		padding: var(--fs-card-pad);
 		border-top: 1px solid var(--fs-border);
 		border-radius: 0 0 var(--fs-radius-lg) var(--fs-radius-lg);
-		text-align: right;
+		text-align: end;
 	}
 
+	/* PHYSICAL, mirrored by hand — see the note on `.close` in base/90-widgets.css for why `float`
+	 * does not take a logical keyword here. This one contradicted its OWN container: `.actions`
+	 * above sets `text-align: end`, which follows the writing direction, while the float did not,
+	 * so in RTL the plate aligned its content to the left while the secondary action stayed on the
+	 * right — the two halves of one row pulling opposite ways. Measured in a live document at
+	 * 1400px: 582px from the reading edge in LTR, 10px in RTL. */
 	.actions .secondary-action,
 	.cbi-page-actions .secondary-action{
 		float: right;
 	}
+	:root[dir="rtl"] .actions .secondary-action,
+	:root[dir="rtl"] .cbi-page-actions .secondary-action { float: left; }
 
 	.actions .secondary-action a,
 	.cbi-page-actions .secondary-action a {

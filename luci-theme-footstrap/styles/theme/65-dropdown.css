@@ -7,14 +7,23 @@
 	.dropdown-menu a:hover,
 	.dropdown-menu a:focus-visible { background: var(--fs-panel2); background-image: none; color: var(--fs-accent); }
 
-	/* Split "Save & Apply": a plain dropdown in the action bar carries no frame of its own. */
-	.cbi-page-actions .cbi-dropdown {
+	/* Split "Save & Apply": a plain dropdown in the action bar carries no frame of its own.
+	 *
+	 * The guard is the same `:not(.btn):not(.cbi-button)` the widget rules below use, and it is
+	 * load-bearing: the split control's outer div IS the button, and the class on it is the one
+	 * ui.js picked for the SELECTED mode — `cbi-button-apply` for "Save & Apply", but
+	 * `cbi-button-negative` the moment the user picks "Apply unchecked" (luci.js's ComboButton
+	 * `classes` map). Unguarded, this rule (0,2,0) erased that variant's fill while its ink
+	 * (--fs-on-danger) survived from the variant rule that sets no background — a button painted
+	 * page-on-page: 1.13:1 in dark and 1.06:1 in light, measured on the footer. Only the mode
+	 * repainted below was ever visible. */
+	.cbi-page-actions .cbi-dropdown:not(.btn):not(.cbi-button) {
 		border: 0; border-radius: var(--fs-radius); background: transparent;
 	}
-	/* …except the split control's outer div IS the apply button (ui.js emits
-	 * `.cbi-dropdown.btn.cbi-button.cbi-button-apply`), which the rule above would paint transparent.
-	 * Repainted by SPECIFICITY — it used to be a `.cbi-button-apply` rule written afterwards, i.e. a
-	 * fix that depended on source order. */
+	/* Apply is the one variant with no fill of its own — `.cbi-button-action` and the rest carry
+	 * theirs from theme/55-buttons.css, and `.cbi-button-apply` is filled only where it is THE
+	 * primary action, which is this bar. Painted by SPECIFICITY — it used to be a rule written
+	 * afterwards, i.e. a fix that depended on source order. */
 	.cbi-page-actions .cbi-dropdown.cbi-button-apply,
 	.cbi-page-actions .cbi-dropdown > .cbi-button {
 		background: var(--fs-accent);
@@ -34,8 +43,17 @@
 	 * the rules below turn those into a working combobox. The display state machine is UNFLAGGED:
 	 * upstream resolved the states with !important, but flag-vs-flag falls back to
 	 * specificity-then-order anyway, so the machine below states the SAME resolution openly (see
-	 * the state-machine block). THREE !important remain — all on `ul` margins, because ui.js
-	 * writes `margin` INLINE on an open list: no cascade outranks an inline style. */
+	 * the state-machine block). The `ul` margins were flagged too, on the stated grounds that ui.js
+	 * writes `margin` INLINE on an open list. IT DOES NOT — grepped on both releases: ui.js touches
+	 * only `top`/`left`/`right`/`maxHeight`/`bottom` on that `ul`, and only under `'ontouchstart' in
+	 * window` (see 90-responsive.css, where the flags that fight THOSE live). The flags came in with
+	 * the absorbed widget from luci-theme-bootstrap, which has no @layer and needed one to beat its
+	 * own `ul { margin: 0 0 10px 25px }`; here the layer split does that for free. They were not
+	 * idle, though — they were beating THIS FILE: `margin: 0 !important` on (0,1,1) out-ranked the
+	 * open popover's own `margin-top` at (0,2,1) below, so the list sat 1px off the control instead
+	 * of the designed 6px, and the two `.btn` rules then needed flags of their own purely to escape
+	 * the first one. Measured on the gallery: dropping all three moves exactly one value (that gap,
+	 * 1px -> 7px) and nothing else. */
 	.cbi-dropdown {
 		display: inline-flex;
 		cursor: pointer;
@@ -49,7 +67,7 @@
 		width: auto;
 	}
 	.cbi-dropdown > ul {
-		margin: 0 !important;
+		margin: 0;
 		padding: 0;
 		list-style: none;
 		overflow-x: hidden;
@@ -58,14 +76,15 @@
 		width: 100%;
 	}
 	/* clears the button's own side inset so the label starts on its text, not on its border.
-	 * !important: ui.js writes `margin` inline on an open list — see 90-responsive.css. */
+	 * Unflagged: (0,3,1) over the rule above's (0,1,1) — it only ever needed a flag to beat that
+	 * rule's flag. */
 	.cbi-dropdown.btn > ul:not(.dropdown),
 	.cbi-dropdown.cbi-button > ul:not(.dropdown) {
-		margin: 0 0 0 var(--fs-space-3) !important;
+		margin: 0 0 0 var(--fs-space-3);
 	}
 	.cbi-dropdown.btn.spinning > ul:not(.dropdown),
 	.cbi-dropdown.cbi-button.spinning > ul:not(.dropdown) {
-		margin: 0 !important;
+		margin: 0;
 	}
 	.cbi-dropdown > ul.preview {
 		display: none;
@@ -86,7 +105,7 @@
 	 * a later layer. A dead declaration is deleted, not relocated. */
 	.cbi-dropdown.btn > .open,
 	.cbi-dropdown.cbi-button > .open {
-		margin-left: .5em;
+		margin-inline-start: .5em;
 	}
 	/* display only: the placeholder's ink is the theme's own `li[placeholder]` --fs-faint below
 	 * (base's --fs-dim had already lost to it by layer — moving it would recolour the row) */
@@ -108,7 +127,7 @@
 	.cbi-dropdown > ul > li .hide-close { display: none; }
 	/* the chip divider on a BUTTON dropdown's preview; the form dropdown zeroes it below */
 	.cbi-dropdown > ul > li[display]:not([display="0"]) {
-		border-left: 1px solid var(--fs-border);
+		border-inline-start: 1px solid var(--fs-border);
 	}
 	.cbi-dropdown[empty] > ul {
 		max-width: 1px;
@@ -121,7 +140,7 @@
 	}
 	.cbi-dropdown > ul > li img {
 		vertical-align: middle;
-		margin-right: .25em;
+		margin-inline-end: .25em;
 	}
 	.cbi-dropdown > ul > li > form > input[type="checkbox"] {
 		margin: 0 var(--fs-space-1) 0 0;
@@ -230,7 +249,7 @@
 		 * the thing the scale exists to stop. Absorbed with the machinery above. */
 		min-height: var(--fs-space-5);
 	}
-	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-left: 0; }
+	.cbi-dropdown:not(.btn):not(.cbi-button) > ul > li[display]:not([display="0"]) { border-inline-start: 0; }
 	.cbi-dropdown > ul > li[placeholder] { color: var(--fs-faint); }
 	/* the multiselect's inline filter/create inputs — moved from base with the generic `input`
 	 * box in theme/60-inputs.css: in base these beat it in-layer, left behind they would lose
@@ -290,11 +309,14 @@
 		border-radius: var(--fs-radius-lg);
 		box-shadow: var(--fs-shadow-pop);
 		padding: var(--fs-space-1-5);
+		/* the gap that detaches the popover from its control. It was DEAD until the `ul` margin
+		 * flags above came out (they out-ranked it from a lower specificity), so the list sat 1px
+		 * off the control — the one value that moved when they went. */
 		margin-top: var(--fs-space-1-5);
 	}
 	.cbi-dropdown[open] > ul.dropdown > li {
 		border-radius: var(--fs-radius-sm); padding: var(--fs-space-2) var(--fs-space-3);
-		border-left: 0; color: var(--fs-text);
+		border-inline-start: 0; color: var(--fs-text);
 		position: relative;
 		/* An OPEN row wraps; only the closed preview ellipsizes. `.cbi-dropdown > ul > li` (0,1,2)
 		 * sets nowrap + overflow:hidden + ellipsis, which is right for the collapsed control — one
@@ -310,7 +332,7 @@
 		border-bottom: 0;
 	}
 	.cbi-dropdown[open] > ul.dropdown > li:not(:last-child)::after {
-		content: ""; position: absolute; left: 11px; right: 11px; bottom: 0;
+		content: ""; position: absolute; inset-inline: 11px; bottom: 0;
 		height: 1px; background: var(--fs-border);
 	}
 	.cbi-dropdown[open] > ul.dropdown > li:hover,
@@ -390,7 +412,7 @@
 		 * why the OpenVPN row stayed one column deep. */
 		.table.cbi-section-table .td {
 			flex: 1 1 100%; min-width: 0; margin: 0;
-			padding: var(--fs-space-1-5) var(--fs-space-2-5) var(--fs-space-1-5) 0; border: 0; text-align: left;
+			padding-block: var(--fs-space-1-5); padding-inline: 0 var(--fs-space-2-5); border: 0; text-align: start;
 			/* same as the data card's cells (theme/30-tables.css): a carded cell holds opaque
 			 * tokens (a real-length IPv6 GUA is 39 chars with no break point — colons are not
 			 * break opportunities), and without `anywhere` one ran 156px past a 360px viewport

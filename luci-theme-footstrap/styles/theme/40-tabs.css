@@ -92,6 +92,28 @@
 		font-weight: var(--fs-weight-bold);
 	}
 
+	/* ---- keyboard focus: a ring that survives the ACTIVE pill ----
+	 *
+	 * base/50-chrome.css drew it as `outline: 2px solid var(--fs-accent)` inset by -2px, which is
+	 * invisible on exactly the tab most likely to be focused: the active pill's own background IS
+	 * --fs-accent (rule above; measured on the router, both are rgb(86,157,245)). Tabbing across a
+	 * strip, the ring vanished the moment it reached the current page's tab.
+	 *
+	 * ONE rule now, and the token is --fs-focus-ring-solo for both states: a tab flips nothing else
+	 * on focus, so the ring IS the indicator, and the tinted --fs-focus-ring measures 1.15-1.29:1
+	 * against the strip — the first version of this fix took it for the inactive pill and swapped
+	 * one invisible indicator for another. -solo's 2px surface gap is also what lets the same
+	 * value serve the ACTIVE pill, whose background is the accent the ring is drawn in.
+	 * box-shadow, not outline, because the strip clips (which is why the outline was inset in the
+	 * first place) and a shadow is not clipped by the scroll container. */
+	#tabmenu ul.tabs > li > a:focus-visible,
+	ul.cbi-tabmenu.mode > li > a:focus-visible,
+	.tabs > li > a:focus-visible,
+	.cbi-tabmenu > li > a:focus-visible {
+		outline: none;
+		box-shadow: var(--fs-focus-ring-solo);
+	}
+
 	/* Density steps for a crowded strip: fs-chrome.js (fitTabStrips) MEASURES whether the tabs
 	 * wrap to a second row and, if so, adds .fs-dense1 then .fs-dense2. Padding is trimmed
 	 * hard first (9/14 -> 5/9 -> 3/7), the font only at the d2 floor (13 -> 12) and the gap

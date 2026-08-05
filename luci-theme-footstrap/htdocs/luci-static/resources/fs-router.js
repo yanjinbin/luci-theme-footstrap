@@ -18,7 +18,7 @@
  * Re-instantiation: L.require('view.x') returns a cached SINGLETON whose __init__ (the render)
  * already ran, so calling it again repaints nothing. Take the class off the instance
  * (prototype.constructor) and `new v.constructor()` for a fresh __init__ → load()+render(), which is
- * what a full load does anyway. docs/14.
+ * what a full load does anyway. docs/spa-router.md.
  *
  * The path->node half lives in fs-menutree.js (the chrome needs it too); the "has a view poisoned
  * this document with its CSS?" half in fs-sheets.js. */
@@ -60,22 +60,39 @@ let _curPath = window.location.pathname;
  * URL/title/chrome. A resolved require whose generation is stale renders nothing. */
 let _navGen = 0;
 
-/* ---- Back must restore the sidebar layout's scroll, and the DOCUMENT is not the scroller there ----
- * In the top layout the document scrolls and the browser's own scrollRestoration ('auto') restores it
- * on popstate. In the sidebar layout the scroller is #maincontent (.fs-main owns overflow-y), and a
- * browser restores INNER scrollable regions only across full loads, never on a same-document
- * traversal — measured (docs/22 §2): Back opened the incoming page at 0, because the swap empties
- * #view, scrollHeight collapses and the browser clamps scrollTop. So the router records the offset
- * itself. NOT by replaceState on scroll: Safari rate-limits history writes (100 per 30 s) and a
- * scroll listener trips it. Each SPA entry instead carries a session-unique id (fsid) in
- * history.state, and the offsets live in this in-memory Map — lost on a full load, which is exactly
- * when the browser's own scrollable-region restoration takes over. The id is session-prefixed
- * because a bare counter restarts with every document: an entry stamped by a PREVIOUS document of
- * this tab would collide with a fresh one and restore another page's offset. */
+/* ---- Back must restore the scroll of WHICHEVER element is the scroller ----
+ * The two layouts scroll different elements: the sidebar layout pins .fs-shell to 100dvh and gives
+ * overflow-y to .fs-main (#maincontent), the top layout lets the document scroll. A browser restores
+ * an INNER scrollable region only across full loads, never on a same-document traversal — measured
+ * (docs/spa-router.md §2): Back opened the incoming page at 0, because the swap empties #view,
+ * scrollHeight collapses and the browser clamps scrollTop.
+ *
+ * The DOCUMENT scroller was left to the browser's own scrollRestoration ('auto') on the grounds that
+ * it is the case a UA does handle — and that is wrong for the same reason, measured on the stand: in
+ * the top layout, scroll Processes to 400, open System, press Back, and the page opens at 0 (the
+ * sidebar layout, restored here, comes back at 400). The UA restores at the traversal, i.e. BEFORE
+ * this handler swaps #view; the height then collapses under the restored offset and the clamp takes
+ * it back to 0, with nothing left to re-apply it. So record and replay BOTH offsets; the one that is
+ * not this layout's scroller is 0 and skipped.
+ *
+ * NOT by replaceState on scroll: Safari rate-limits history writes (100 per 30 s) and a scroll
+ * listener trips it. Each SPA entry instead carries a session-unique id (fsid) in history.state, and
+ * the offsets live in this in-memory Map — lost on a full load, which is exactly when the browser's
+ * own scrollable-region restoration takes over. The id is session-prefixed because a bare counter
+ * restarts with every document: an entry stamped by a PREVIOUS document of this tab would collide
+ * with a fresh one and restore another page's offset. */
 const _scrollMem = new Map();
 const _scrollSess = Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 let _histN = 0;
 let _curId = null;
+/* …and it is BOUNDED, because this document outlives every page in it. One entry per history entry
+ * per session, never evicted, is the same shape as the leaks this file already fixes elsewhere (the
+ * action-column resize listener, the view pollers) — small enough that nobody would see it and
+ * unbounded all the same. A browser keeps ~50 entries per tab and the ones past that cannot be
+ * traversed back to, so remembering more offsets than that can never be read. Least-recently-SAVED
+ * goes first: a Map iterates in insertion order and `set` on an existing key does not refresh it,
+ * so the re-save below is delete-then-set. */
+const SCROLL_MEM_MAX = 50;
 function newEntryId() { return _scrollSess + ':' + (++_histN); }
 
 /* adopt the entry we are standing on: reuse its fsid if it has one, stamp one otherwise (entries
@@ -90,23 +107,53 @@ function adoptEntry() {
 /* the outgoing DOM is still on screen at both call sites (the click, the popstate), so this must
  * run BEFORE _curId moves on to the incoming entry */
 function saveScroll() {
+	if (!_curId) return;
 	const sc = document.getElementById('maincontent');
-	if (_curId && sc) _scrollMem.set(_curId, sc.scrollTop);
+	_scrollMem.delete(_curId);	/* re-insert, so this entry counts as the most recently saved */
+	_scrollMem.set(_curId, { win: Math.round(window.scrollY) || 0, main: sc ? sc.scrollTop : 0 });
+	while (_scrollMem.size > SCROLL_MEM_MAX)
+		_scrollMem.delete(_scrollMem.keys().next().value);
 }
 
-/* Put #maincontent back where the entry left it — but only once the incoming view has grown that
- * much height (docs/22 §5: restoring before the content exists is clamped to 0 and reads as
+/* Put the scrollers back where the entry left them — but only once the incoming view has grown that
+ * much height (docs/spa-router.md §5: restoring before the content exists is clamped to 0 and reads as
  * "worked"). The view renders behind an RPC, so poll by frame; a newer navigation cancels via the
- * generation, and a page that never reaches the old height again is simply left at the top. */
-function restoreScroll(top, gen) {
-	if (!top) return;
+ * generation, and a page that never reaches the old height again is simply left at the top. Each
+ * offset is waited for on its OWN scroller, so a layout switched between the two entries restores
+ * whichever half it can rather than blocking on the half that no longer scrolls. */
+function restoreScroll(pos, gen) {
+	if (!pos || (!pos.win && !pos.main)) return;
 	let tries = 300; /* ~5 s at 60 fps — outlasts a slow RPC without polling forever */
 	(function tick() {
 		if (gen !== _navGen || --tries < 0) return;
+		const de = document.documentElement;
 		const sc = document.getElementById('maincontent');
-		if (sc && sc.scrollHeight - sc.clientHeight >= top) sc.scrollTop = top;
-		else requestAnimationFrame(tick);
+		let pending = false;
+		if (pos.main) {
+			if (sc && sc.scrollHeight - sc.clientHeight >= pos.main) sc.scrollTop = pos.main;
+			else pending = true;
+		}
+		if (pos.win) {
+			if (de.scrollHeight - de.clientHeight >= pos.win) window.scrollTo(0, pos.win);
+			else pending = true;
+		}
+		if (pending) requestAnimationFrame(tick);
 	})();
+}
+
+/* ---- the host half of "<host> | <page>" is read ONCE ----
+ * head.ut stamps it and it cannot change within a document, but navigate() used to re-derive it from
+ * the LIVE document.title on every hop — so any page that renames the tab became the host for every
+ * page after it, until a full load. Third-party views do rename it (log viewers, dashboards), and it
+ * takes only one: measured on the stand, a view setting `document.title = 'ACME Dashboard'` left the
+ * next hops reading "ACME Dashboard | Routing", "ACME Dashboard | System". Captured at seed(), i.e.
+ * at chrome init on the full load that started the session; the lazy branch is for a document whose
+ * chrome came up without seed() having run. */
+let _titleHost = null;
+function titleHost() {
+	if (_titleHost === null)
+		_titleHost = (document.title.split('|')[0] || '').trim();
+	return _titleHost;
 }
 
 /* The view class the page CURRENTLY on screen wants (what _curPath resolves to). Read by the
@@ -200,22 +247,126 @@ function moduleUrl(className) {
 	return (L.env.base_url || '') + '/' + className.replace(/\./g, '/') + '.js' + v;
 }
 
-/* Hover prefetch: warm the browser HTTP cache for a view's module JS with a plain fetch() — NOT
- * require(), which would run the class __init__ and render another page's view into #view. The
- * later click's require() then hits cache instead of the network (−10–40 ms LAN on a first visit,
- * more over WAN/VPN). Deduped per class; failures are silent (it is a pure optimisation). */
+/* ---- link prefetch: warm the module cache for a page the user is about to open ----
+ *
+ * A plain fetch(), NOT require(): require() instantiates, and a view's __init__ IS its render, so it
+ * would paint another page into #view. fetch() only fills the browser's HTTP cache, which the later
+ * require()'s XHR then hits. Deduped per class; failures are silent (a pure optimisation).
+ *
+ * TRANSITIVE, and that is where most of the win is: warming the view class alone leaves its own
+ * `require` pragmas one round-trip behind it. view/network/routes.js pulls tools/network.js (40.5 KB),
+ * and measured on the dev router at 120 ms RTT a first visit cost 418 ms with the view warmed against
+ * 296 ms with its deps warmed too — one RTT exactly. Over six pages, 1713 ms cold → 1184 warmed →
+ * 1052 warmed transitively. The bytes are in hand either way, so the scan is free.
+ *
+ * The scan MUST NOT be line-anchored. The shipped files are MINIFIED and every pragma sits on one
+ * line (`'use strict';'require view';'require fs';…`), so /^'require …'$/m matches nothing at all —
+ * silently, which is how the first attempt at this measured a win of zero. luci.js lexes the leading
+ * string literals; this reads the same head of the file with one regex. */
+const PRAGMA_HEAD = 2000;	/* bytes of leading literals to scan — luci.js stops at the first non-string token */
+const PREFETCH_DEPTH = 3;
+
+function pragmaDeps(src) {
+	const re = /(['"])require[ \t]+([^'"]+?)\1/g;
+	const head = src.slice(0, PRAGMA_HEAD);
+	const out = [];
+	let m;
+	while ((m = re.exec(head)))
+		out.push(m[2].split(/[ \t]+as[ \t]+/)[0]);
+	return out;
+}
+
+/* SIX CLASS NAMES HAVE NO FILE, and fetching one is a guaranteed 404 in the user's console. luci.js
+ * seeds its class registry with them at load — `const classes = { baseclass: Class, dom: DOM,
+ * poll: Poll, request: Request, session: Session, view: View }` — so require() answers them from
+ * memory and never asks the network, while `ls /www/luci-static/resources` has no baseclass.js,
+ * dom.js, poll.js, request.js or session.js at all. Every view file's pragmas name `view` and
+ * `baseclass`, so a dependency walk hits this on its very first step: measured, warming the recents
+ * at idle put 404s for view.js and poll.js in the console of every page load, and the first hover
+ * added baseclass.js. A require() that 404s is noise this theme refuses to make, and the same
+ * standard applies here.
+ *
+ * A future LuCI adding a seventh built-in would cost one 404 per session — `_prefetched` makes it
+ * at most one — and the list is a literal from luci.js, not a guess about it. */
+const BUILTIN_CLASSES = new Set([ 'baseclass', 'dom', 'poll', 'request', 'session', 'view' ]);
+
+/* Is this class already instantiated? require() attaches its singleton to the LuCI prototype
+ * (`ptr[parts[idx]] = instance`), so a SINGLE-segment name reads back as L[name] — which covers the
+ * libs a loaded page has already pulled in (ui, form, uci, rpc, fs, validation, and network/firewall
+ * once some network page has been open). Skipping them spends no request on a cache hit nobody needs.
+ * `instanceof L.Class` rather than a truthiness test: L.env, L.url and L.get are members too, and a
+ * dep whose name collided with one of those would otherwise be skipped without ever being loaded —
+ * which is why this cannot be the guard for the six above either: they are seeded as CONSTRUCTORS
+ * (and under other names — L.Poll, L.Request, L.Class), so no `instanceof` probe sees them. A DOTTED
+ * name (tools.network) is not attached unless its parent already exists, so it is simply fetched —
+ * and those are the ones the win comes from. */
+function classLoaded(name) {
+	if (BUILTIN_CLASSES.has(name)) return true;
+	try { return name.indexOf('.') < 0 && window.L[name] instanceof window.L.Class; }
+	catch (e) { return false; }
+}
+
 /* view classes already required, i.e. the ones LuCI has an instance cached for. A class NOT in
  * here is rendered by the require() itself (see navigate). */
 const _seen = new Set();
 const _prefetched = new Set();
-function prefetchView(pathname) {
-	const segs = tree.segsFromPath(pathname);
-	if (!segs) return;
+/* className -> the promise of ITS OWN body being in the HTTP cache; navigate() waits on that.
+ * Deliberately the body and not the subtree, see _committed below. */
+const _warming = new Map();
+/* Roots a navigation has taken over. Speculation below them STOPS: require() is now fetching the same
+ * graph and pipelines its parse and eval against those fetches, so descending would only race it —
+ * measured at 120 ms RTT, waiting for the whole subtree instead cost 658 ms against 525 ms racing,
+ * for the sake of a duplicate that stopping avoids outright. Deps have not been asked for yet when a
+ * click arrives (they start only once the root body lands), so there is nothing in flight to collide
+ * with: this leaves zero duplicated bytes AND require()'s pipelining. */
+const _committed = new Set();
+
+function warmClass(name, depth, root) {
+	if (_prefetched.has(name)) return;
+	_prefetched.add(name);
+	if (classLoaded(name)) return;
+	let req;
+	try { req = fetch(moduleUrl(name), { credentials: 'same-origin' }); }
+	catch (e) { return; }
+	const body = req.then((res) => (res.ok ? res.text() : '')).catch(() => '');
+	_warming.set(name, body.then(() => {}, () => {}));
+	/* The visited set is global and the depth capped, so the walk terminates regardless of what the
+	 * pragmas say — require() raises DependencyError on a cycle, but only for classes it actually
+	 * loads, and this walks files it may never hand to require() at all. */
+	if (depth < PREFETCH_DEPTH)
+		body.then((src) => {
+			if (_committed.has(root)) return;
+			for (const d of pragmaDeps(src)) warmClass(d, depth + 1, root);
+		});
+}
+
+/* Warm the view a menu path resolves to, plus its dependency tree. `segs` is the menu path
+ * (`admin/network/routes`), the shape fs-search stores its recents in. */
+function prefetchSegs(segs) {
+	if (!Array.isArray(segs) || !segs.length) return;
 	const res = tree.resolveSegs(segs);
 	const className = tree.viewClassFor(res && res.node);
-	if (!className || _prefetched.has(className)) return;
-	_prefetched.add(className);
-	try { fetch(moduleUrl(className), { credentials: 'same-origin' }).catch(() => {}); } catch (e) {}
+	if (className) warmClass(className, 0, className);
+}
+
+function prefetchView(pathname) {
+	const segs = tree.segsFromPath(pathname);
+	if (segs) prefetchSegs(segs);
+}
+
+/* Wait for an in-flight prefetch of `className` instead of racing it — see the call site. Capped,
+ * because a wedged prefetch must never wedge a navigation: on a stalled connection require()'s own
+ * XHR and its error path are the better place to end up. */
+const WARM_WAIT_MS = 5000;
+function warmedThen(className) {
+	_committed.add(className);
+	const body = _warming.get(className);
+	if (!body) return Promise.resolve();
+	/* the loser of the race is cancelled: a prefetch that lands in 40 ms otherwise leaves a 5 s
+	 * timer armed behind every single navigation, doing nothing but keeping its closure alive */
+	let t = 0;
+	return Promise.race([ body, new Promise((r) => { t = window.setTimeout(r, WARM_WAIT_MS); }) ])
+		.finally(() => window.clearTimeout(t));
 }
 
 /* The page we are standing on arrived as a full load, so LuCI has ALREADY required — hence
@@ -225,6 +376,7 @@ function seed() {
 	const here = tree.viewClassFor(tree.currentNode());
 	if (here)
 		_seen.add(here);
+	titleHost();	/* before any view can rename the tab — see there */
 	/* the served page's entry needs an id too, or the first Back TO it has nothing to look up */
 	adoptEntry();
 }
@@ -269,10 +421,51 @@ function navigate(pathname, push, kbd) {
 		    !c.classList.contains('alert-message') && c.nodeName !== 'NOSCRIPT')
 			c.remove();
 	});
+	/* …and the RUNTIME notifications, which live one level up and therefore survived every
+	 * navigation. `ui.addNotification()` does `mc.insertBefore(msg, mc.firstElementChild)` on
+	 * #maincontent — this theme's <main class="fs-main"> — while the sweep above only reaches
+	 * children of .fs-content, a descendant of it. A full load clears them; SPA never did, so
+	 * "Upload request failed" and every third-party banner stacked up over each following page for
+	 * the rest of the session (reproduced: the banner outlives a nav, and only F5 removes it).
+	 * The .fs-content banners kept above are the SERVER's notices (notices.ut) and legitimately
+	 * outlive a page; these are not the same thing. */
+	const mainHost = document.getElementById('maincontent');
+	if (mainHost)
+		Array.from(mainHost.children).forEach((c) => {
+			if (c.classList.contains('alert-message')) c.remove();
+		});
 	if (!document.getElementById('view')) {
 		const v = document.createElement('div');
 		v.id = 'view';
 		contentHost.appendChild(v);
+	}
+
+	/* SAY THAT SOMETHING IS LOADING, on a route whose module has never been fetched.
+	 *
+	 * The chrome switches instantly — title, URL, body[data-page], the menu highlight — but the
+	 * sweep above deliberately does not touch the children of #view, and LuCI's own spinner is
+	 * written by `View.__init__`, i.e. only once the view module has ARRIVED. So between the click
+	 * and the last round-trip of the module chain the user reads the PREVIOUS page's content under
+	 * the new page's title, with nothing moving. Measured on the router at 600 ms latency: at 150 ms
+	 * and 400 ms #view still held the System page while everything else said Processes; the
+	 * "Loading view…" spinner appeared at 900 ms and the content at 1800 ms. A full load would have
+	 * shown the browser's own progress for that whole window.
+	 *
+	 * Only for a COLD route: `_seen` means the class has already been through require(), where
+	 * View.__init__ paints its spinner synchronously and there is no gap to fill.
+	 *
+	 * Deliberately the SAME markup and the SAME msgid luci-base uses, not a skeleton of our own:
+	 * when View.__init__ replaces it there is nothing to see, and the string arrives already
+	 * translated in the ~40 languages this theme ships no catalogue for (the chrome rule — a
+	 * context-free msgid is how we inherit luci-base's translation). */
+	if (!_seen.has(tree.viewClassFor(node))) {
+		const vp = document.getElementById('view');
+		if (vp) {
+			const s = document.createElement('div');
+			s.className = 'spinning';
+			s.textContent = _('Loading view…');
+			vp.replaceChildren(s);
+		}
 	}
 
 	/* teardown: drop the outgoing view's pollers, then put the poll loop back into the state a FRESH
@@ -297,17 +490,25 @@ function navigate(pathname, push, kbd) {
 	/* kill the outgoing view's plain setInterval pollers too (podkop's log tailer) — a full load
 	 * would have. L.Poll's own tick survives. */
 	clearViewIntervals();
-	/* run every registered navigation callback — the optional updater's poll-chain cancel (its
-	 * setTimeout would otherwise keep firing fs.exec RPCs and pop its modal over the page we are
-	 * about to open) and the search palette's recent-pages record. The router carries NO static
-	 * dependency on the optional updater — a missing one would be a DependencyError that takes out
-	 * the whole chrome — so the edge is inverted: fs-update.js registers its cancel via onNavigate()
-	 * below.
+	/* the outgoing page's links are about to become a detached tree — do not hold one of them */
+	_lastHovered = null;
+	/* run every registered navigation callback — today the search palette's recent-pages record and
+	 * its close-on-navigate. The seam is deliberately inverted: a registrant calls onNavigate()
+	 * (below) and the router names nobody, so an optional module that is not installed is not a
+	 * DependencyError that takes out the whole chrome.
 	 *
 	 * The RESOLVED segments are passed in, and that is not convenience: this runs BEFORE L.env is
 	 * re-pointed a few lines down, so a callback reading L.env.dispatchpath for "where are we going"
 	 * would silently record the page being left. */
-	for (const fn of _navCbs) { try { fn(rsegs); } catch (e) {} }
+	/* Logged, not swallowed. A registrant that throws is still isolated — the loop must finish, or a
+	 * broken registrant would take the palette's recents and its close-on-navigate with it — but the
+	 * empty catch made a registrant that throws on EVERY navigation indistinguishable from one that
+	 * was never registered, which is the failure mode the .catch at the bottom of this file was
+	 * given a console.error for. */
+	for (const fn of _navCbs) {
+		try { fn(rsegs); }
+		catch (e) { console.error('footstrap: a navigation callback threw', e); }
+	}
 	try { if (typeof ui.hideModal === 'function') ui.hideModal(); } catch (e) {}
 
 	/* point the runtime env at the new node so views, tabs and highlighting read the right
@@ -318,9 +519,12 @@ function navigate(pathname, push, kbd) {
 	/* `readonly` is not decoration: luci.js implements hasViewPermission() as
 	 * `!env.nodespec.readonly`, and views (network/interfaces, wireless, the package manager)
 	 * plus luci.js's Save/Apply footer key their disabled state off it. Dropping it handed a
-	 * read-only user LIVE Save/Apply buttons on an SPA nav, where a full load disabled them. */
+	 * read-only user LIVE Save/Apply buttons on an SPA nav, where a full load disabled them —
+	 * and reading it off the LEAF was still dropping it for two thirds of the readonly pages,
+	 * because the dispatcher folds the acls of the whole path into that one flag. See
+	 * fs-menutree's readonlyForSegs(). */
 	L.env.nodespec     = { satisfied: true, action: node.action, title: node.title,
-	                       depends: node.depends, readonly: node.readonly };
+	                       depends: node.depends, readonly: tree.readonlyForSegs(rsegs) };
 
 	/* Keep <body data-page> in sync with the route: the server stamps the dispatch path
 	 * (`ctx.path`) on every full load, and page-scoped CSS keys off it. `rsegs` is the RESOLVED
@@ -328,6 +532,14 @@ function navigate(pathname, push, kbd) {
 	 * it arrives as a full load or a client nav. Without the re-stamp the incoming page keeps the
 	 * previous page's data-page and its scoped styles silently do not apply. */
 	document.body.setAttribute('data-page', rsegs.join('-'));
+
+	/* …and immediately hand the new page to fs-sheets, which darkens every foreign sheet that
+	 * belongs to a DIFFERENT page and re-lights the ones that belong to this one. This is what lets
+	 * an invasive sheet stay in the document without spending it — the alternative was a full load
+	 * on the way out of any page carrying one, which stock LuCI's five realtime views all do (see
+	 * the page-ownership block in fs-sheets.js). It must run AFTER the stamp above and BEFORE the
+	 * view renders, so nothing paints through a sheet that no longer owns the page. */
+	sheets.scopeToCurrentPage(rsegs);
 
 	/* Re-navigating to the page already on screen must REPLACE its history entry, not push a
 	 * second one. Clicking the active menu item is ordinary, and a duplicate entry makes Back do
@@ -342,8 +554,7 @@ function navigate(pathname, push, kbd) {
 	}
 
 	/* titles: <host> | <page> */
-	const host = (document.title.split('|')[0] || '').trim();
-	document.title = node.title ? (host + ' | ' + _(node.title)) : host;
+	document.title = node.title ? (titleHost() + ' | ' + _(node.title)) : titleHost();
 	const tmain = document.querySelector('.fs-title-main');
 	if (tmain && node.title)
 		tmain.textContent = _(node.title);
@@ -356,11 +567,10 @@ function navigate(pathname, push, kbd) {
 	 * can be static rather than a composited sticky layer (issue #7) — so reset it too; scrollTo on
 	 * whichever of the two is not the scroller is a harmless no-op.
 	 *
-	 * A popstate replay resets nothing on purpose: the DOCUMENT scroller (top layout) is restored by
-	 * the browser itself (scrollRestoration is 'auto'), and #maincontent (sidebar layout) is restored
-	 * by the popstate handler from _scrollMem — see restoreScroll(), and do not reach for
-	 * `history.scrollRestoration = 'manual'` here: it is inert for #maincontent and would take the
-	 * top layout's working document restoration away (docs/22 §2). */
+	 * A popstate replay resets nothing on purpose: BOTH scrollers are restored there from _scrollMem —
+	 * see restoreScroll(). scrollRestoration is left at 'auto': the UA's own attempt lands before the
+	 * swap and is undone by it (§2), so it neither helps nor hurts, and 'manual' would only take away
+	 * the case that does work — a genuine full load. */
 	if (push) {
 		window.scrollTo(0, 0);
 		const sc = document.getElementById('maincontent');
@@ -371,7 +581,7 @@ function navigate(pathname, push, kbd) {
 	 * renderChrome() has just done `#topmenu.innerHTML = ''`, so the very <a> the user activated with
 	 * Enter no longer exists: focus falls back to <body>, the next Tab restarts at the skip link, and
 	 * nothing says the page changed — URL, title and #view all moved in silence. So do what a real
-	 * navigation would, and where matters (Sutton's five-prototype study, docs/22 §3): a KEYBOARD
+	 * navigation would, and where matters (Sutton's five-prototype study, docs/spa-router.md §3): a KEYBOARD
 	 * activation (ev.detail === 0) moves focus to the skip link — a small target whose :focus overlay
 	 * tells a sighted keyboard user where they are, with Enter jumping straight to the content; its
 	 * text differs from the live region's announcement below, so the double announcement complements
@@ -389,7 +599,7 @@ function navigate(pathname, push, kbd) {
 	/* Require through the runtime singleton `window.L`, NOT the bare `L` a module factory is handed:
 	 * the dispatcher builds `window.L = new LuCI()` and `ui` augments THAT instance with
 	 * itemlist/showModal/…, so a view required via the bare `L` throws "L.itemlist is not a
-	 * function" mid-render (the two-L trap, docs/14). require/instanceof errors fall back to a real
+	 * function" mid-render (the two-L trap, docs/spa-router.md). require/instanceof errors fall back to a real
 	 * navigation; render-time errors are handled inside LuCI.view, as on a full load.
 	 *
 	 * WHEN to re-instantiate is the subtle part. require() does not hand back a class — it caches an
@@ -400,12 +610,31 @@ function navigate(pathname, push, kbd) {
 	 * singleton whose __init__ already ran. `_seen` is that distinction, and it must be read BEFORE
 	 * the require resolves, since the require is what fills LuCI's cache. */
 	/* Status→Overview needs the 3 template globals (progressbar/renderBox/renderBadge) an SPA
-	 * arrival never defines. fs-overview.js defines them in the Footstrap chrome path, away from
-	 * LuCI's global status/include directory. */
+	 * arrival never defines. fs-overview.js defines them at its own module eval — which, as a
+	 * chrome module, happens at chrome init, i.e. before any SPA navigation can occur. Not here:
+	 * the router has no business owning luci-mod-status's globals. */
 	const RT = window.L;
 	const cached = _seen.has(className);
-	_seen.add(className);
-	RT.require(className).then((view) => {
+	/* WAIT for an in-flight prefetch of this class rather than racing it. Two requests for the same
+	 * URL do not coalesce, so a click landing before the prefetch does downloads the module TWICE,
+	 * both at full latency, and gains nothing — measured at 120 ms RTT: the prefetch ran 2664→2788 ms
+	 * and the require's XHR 2682→2788 ms for the same 8.6 KB. That is the NORMAL case on a touch
+	 * device, where pointerover fires the same moment as the tap. Waiting costs nothing: the XHR
+	 * would have waited for exactly those bytes.
+	 *
+	 * `_seen` is marked here and not before, because it means "this class has been through require()"
+	 * and the wait introduces a window in which we may never get there. Marking it up front would
+	 * make the NEXT navigation take the cached branch — `new view.constructor()` on a class whose
+	 * require() is what renders it — i.e. two renders and two pollers for one page. */
+	warmedThen(className).then(() => {
+		/* superseded while waiting: never start the require. On a first visit the require IS the
+		 * render, so starting it here would paint a page the user has already left and hand
+		 * repairStaleRender() a mess that only exists because a require in flight cannot be stopped. */
+		if (gen !== _navGen) return null;
+		_seen.add(className);
+		return RT.require(className);
+	}).then((view) => {
+		if (view == null) return;
 		if (!(view instanceof RT.view))
 			throw new TypeError('Loaded class ' + className + ' is not a view');
 		if (gen !== _navGen) {
@@ -451,6 +680,23 @@ function linkUrlFrom(ev) {
 	return url.origin === window.location.origin ? url : null;
 }
 
+/* Warm the view module behind an event's link — ONE filter for all three prefetch triggers, and the
+ * same one the click router applies two lines further down: navigate() pushes a bare path, so a link
+ * carrying ?query or #hash full-loads, and warming its module spends a request on a page the SPA
+ * path can never open. The click handler declined those from the start; the three triggers below had
+ * each grown a copy of the URL test without that half. */
+function prefetchFrom(ev) {
+	const url = linkUrlFrom(ev);
+	if (url && !url.search && !url.hash)
+		prefetchView(url.pathname);
+}
+
+/* The last <a> a pointer crossed, kept only to stop `pointerover` re-firing per child span (see the
+ * listener). Cleared on every navigation: an element holds its parent, so retaining one anchor
+ * retains the whole detached tree the content swap has just thrown away — a small leak, but one that
+ * lasts until the pointer happens to cross some other link. */
+let _lastHovered = null;
+
 function wireRouter() {
 	if (_wired) return;
 	_wired = true;
@@ -479,15 +725,24 @@ function wireRouter() {
 	 * EVERY element the pointer crosses — dragging across the process table fires it hundreds of
 	 * times — so bail on the element first: the same <a> re-fires this for every child span it
 	 * contains, and a non-link target is the overwhelmingly common case. */
-	let lastHovered = null;
 	document.addEventListener('pointerover', (ev) => {
 		const a = ev.target.closest?.('a[href]');
-		if (!a || a === lastHovered) return;
-		lastHovered = a;
-		const url = linkUrlFrom(ev);
-		if (url)
-			prefetchView(url.pathname);
+		if (!a || a === _lastHovered) return;
+		_lastHovered = a;
+		prefetchFrom(ev);
 	}, { passive: true });
+
+	/* The pointer is not the only way a link gets chosen, and the other two ways got no prefetch at
+	 * all. A KEYBOARD user Tabs to the link and presses Enter — no pointer event ever fires, so the
+	 * whole optimisation was invisible to them; focusin is the keyboard's hover, and the Tab→Enter gap
+	 * is human-scale, so the module is usually there by the time Enter lands. A TOUCH user gets a
+	 * pointerover, but at the same moment as the tap, which is what the in-flight wait in navigate()
+	 * is for rather than an earlier trigger. pointerdown adds the one pointer case pointerover cannot
+	 * see: a link that scrolled UNDER a stationary pointer crosses no boundary and fires nothing.
+	 * Neither needs the lastHovered guard above — they fire once per interaction, not per element
+	 * crossed — and warmClass() dedupes per class anyway. */
+	document.addEventListener('focusin', prefetchFrom, { passive: true });
+	document.addEventListener('pointerdown', prefetchFrom, { passive: true });
 
 	window.addEventListener('popstate', () => {
 		/* an entry carrying a query belongs to a full load (we only ever push bare paths):
@@ -539,7 +794,7 @@ document.addEventListener('poll-stop', () => {
  * overview left open in a background tab hammers ubus 24/7 (notably the pricey iwinfo getAssocList)
  * on a low-power router. stop() only clearInterval()s (the queue survives); start() re-arms and runs
  * one immediate step(), so data is fresh on refocus. A poller added while hidden will not auto-start
- * (stop() deletes the tick) — start() picks it up on show: deferred, not lost. docs/14. */
+ * (stop() deletes the tick) — start() picks it up on show: deferred, not lost. docs/spa-router.md. */
 let _visWired = false;
 function wireVisibility() {
 	if (_visWired) return;
@@ -562,9 +817,10 @@ function wireVisibility() {
 }
 
 /* Callbacks to run on every SPA navigation, each handed the resolved segments of the INCOMING page
- * (see navigate() — they run before L.env is re-pointed). Registrants: the optional updater's poll
- * cancel, which is why the registry exists at all (the router keeps no static dependency on that
- * optional module), and fs-search's recent-pages record. */
+ * (see navigate() — they run before L.env is re-pointed). The registry is INVERTED on purpose: a
+ * registrant calls in and the router names nobody, so it can never grow a static dependency on a
+ * module that may not be installed. Registrant today: fs-search's recent-pages record and its
+ * close-on-navigate. */
 const _navCbs = [];
 function onNavigate(fn) { if (typeof fn === 'function') _navCbs.push(fn); }
 
@@ -572,5 +828,9 @@ return baseclass.extend({
 	seed,
 	wire: wireRouter,
 	wireVisibility,
-	onNavigate
+	onNavigate,
+	/* fs-search warms the pages this admin actually uses (its recents) and the arrow-key-highlighted
+	 * result, both of which the pointer/focus triggers above cannot see. The edge points that way
+	 * round — search → router — because the router must keep no dependency on the palette. */
+	prefetchSegs
 });

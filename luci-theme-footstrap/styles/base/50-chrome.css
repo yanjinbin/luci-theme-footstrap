@@ -16,7 +16,7 @@
 	}
 
 	.dropdown:hover ul.dropdown-menu {
-		left: 0;
+		inset-inline-start: 0;
 	}
 
 	/* Tab-strip visuals (margins, gradients, per-state colours): theme/40-tabs.css —
@@ -35,13 +35,10 @@
 		outline: none;
 	}
 
-	/* A ring, not `text-decoration: underline` — hover underlines links too (20-typography.css),
-	 * so underline-only keyboard focus was indistinguishable from hover. Offset is NEGATIVE:
-	 * the tab row's container clips, so an outside ring loses its top or bottom edge. */
-	.tabs > li > a:focus-visible, .cbi-tabmenu > li > a:focus-visible {
-		outline: 2px solid var(--fs-accent);
-		outline-offset: -2px;
-	}
+	/* The tab focus ring lives in theme/40-tabs.css now, and it had to move: an accent outline is
+	 * invisible on the ACTIVE pill, whose fill is that same accent. The rule that stood here was
+	 * repainted by the theme in full (same selectors, `outline: none` + a box-shadow ring), so
+	 * leaving it would only be a dead declaration audit.py --strict reports. */
 
 	.cbi-tab-disabled[data-errors]::after {
 		content: attr(data-errors);
@@ -52,7 +49,7 @@
 		/* a pill, so it says so — `8px` was half the height above, restated by hand */
 		border-radius: var(--fs-radius-pill);
 		text-align: center;
-		margin-right: var(--fs-space-1);
+		margin-inline-end: var(--fs-space-1);
 		padding: 0 var(--fs-space-1);
 		display: inline-flex;
 		flex-direction: column;
@@ -79,7 +76,7 @@
 	.tabs a.menu:after, .tabs .dropdown-toggle:after {
 		border-top-color: var(--fs-dim);
 		align-self: center;
-		margin-left: var(--fs-space-1);
+		margin-inline-start: var(--fs-space-1);
 	}
 
 	.tabs li.open.menu .menu, .tabs .open.dropdown .dropdown-toggle {
@@ -126,6 +123,6 @@
 	}
 
 	footer ul.breadcrumb {
-		margin-left: auto;
+		margin-inline-start: auto;
 	}
 }

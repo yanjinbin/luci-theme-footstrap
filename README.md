@@ -3,79 +3,69 @@
 **English** · [Русский](README_ru.md) ·
 **[Playground — try the whole thing with no router](https://vizzletf.github.io/luci-theme-footstrap/playground.html)**
 
-<img src="assets/readme/overview-top-dark.png" width="100%" alt="The same overview in dark with the top bar: the menu sits on the brand's row and the content runs full width.">
+[![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap.json)](https://owfeed.org/install/)
+[![owfeed](https://img.shields.io/endpoint?url=https://repo.owfeed.org/badge/luci-theme-footstrap-releases.json)](https://owfeed.org/install/)
+
+A LuCI theme for OpenWrt 24.10 and newer. No framework, `luci-base` is the only dependency.
+
+<picture>
+  <source media="(max-width: 767px)" srcset="assets/readme/phone-menu-dark.png">
+  <img src="assets/readme/overview-top-dark.png" width="100%" alt="The same overview in dark with the top bar: the menu sits on the brand's row and the content runs full width.">
+</picture>
+
+<details>
+<summary>Appearance settings</summary>
+
+<img src="assets/readme/appearance-dark.png" width="100%" alt="The Footstrap tab on System → System: layout, theme, palette, density and rounding; the colour fields for accent, the status colours and the surfaces, each with the contrast it lands at in words; the wallpaper picker with the cats doodle behind the page; and Save as default next to the two resets.">
+
+</details>
+
+## Install
+
+```sh
+wget -qO- https://github.com/VizzleTF/luci-theme-footstrap/releases/latest/download/install.sh | sh
+```
+
+The script adds its own package feed and installs from it. After that the theme upgrades with the
+router: `apk update && apk upgrade` (or `opkg`).
+
+Then pick **Footstrap** in **System → System → Language and Style**, field "Design".
 
 [More screenshots →](docs/screenshots/)
 
 ## What it does
 
-<br clear="left">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/appearance-dark.png">
-  <img align="right" width="279" src="assets/readme/appearance-light.png" alt="The Appearance popover: layout, theme, palette, density, wallpaper, tint, accent, rounding, submenus, updates, and Save/Reset as the router default.">
-</picture>
-
-### Styles apps, not just the stock pages.
-
-### Works on a phone.
-
-### Light.
-
-### Faster than bootstrap
-
-### It can update itself.
-
-### Have own appearence.
-
-
-You pick **Footstrap** once in **System → System → Language and Style**. Every axis on the right is a
-*client* preference: it applies instantly, with no reload.
-
-- **Layout** — side menu or top bar
-- **Theme** — auto (follows your OS), light or dark
-- **Palette** — Footstrap (GitHub Primer colours) or Hi-Contrast
-- **Density** — compact, normal or large
-- **Wallpaper** — off, cats, or an image you upload
-- **Tint** — washes one hue into the background, so you can tell which router a tab (or a screenshot
-  in a ticket) belongs to
-- **Accent** — re-hues buttons, toggles, sliders and focus rings
-- **Rounding** — corner radius, 0–20px
-- **Submenus** — keep several sections open, or auto-collapse to one
-
-A set you like can be saved as the router-wide default, so a fresh browser starts from it.
-<br clear="right">
-
+- **Styles every page, stock or not** — but never overwrites what an app styles itself
+- **Works on a phone**
+- **Faster than bootstrap** — the numbers are below
+- **Upgrades with the router**, from the package feed
+- **Eighteen appearance axes**, applied instantly, in one tab
 
 ## Measured, not claimed
 
-<br clear="right">
-<img src="assets/readme/speed.svg" width="720" alt="Benchmark: Wireless status 288 ms to 16 ms, Interfaces 367 to 63, DNS 328 to 84, Firewall zones 300 to 88. Whole 36-page run 7458 ms to 3196 ms, 2.33 times; median page 3.04 times; requests per page 15–48 down to 0–8.">
+Time to first paint, same router, same pages.
 
-<br clear="right">
+| Page | bootstrap | footstrap |
+|---|---:|---:|
+| Wireless status | 271 ms | **54 ms** |
+| Interfaces | 374 ms | **111 ms** |
+| DNS | 329 ms | **108 ms** |
+| Firewall zones | 311 ms | **79 ms** |
+| 38-page run | 11 306 ms | **4933 ms** |
+| Requests/page | 15–47 | **0–7** |
 
-## Install
+Median page **3.03× faster**, the whole run **2.29×**. Router CPU for the same tour: 37.3 s against
+**18.4 s**. Measured on real hardware, five runs — method and full data in
+[docs/benchmark.md](docs/benchmark.md).
 
-<br clear="right">
+## Documentation
 
-```sh
-wget -qO- https://gh-proxy.com/https://raw.githubusercontent.com/yanjinbin/luci-theme-footstrap/main/install.sh | sh
-```
+Developer documentation is in **[docs/](docs/README.md)** — architecture, the design system, the
+stylesheet build, the SPA router, packaging, the release runbook. Start with
+[architecture.md](docs/architecture.md) for what the theme is, or
+[conventions.md](docs/conventions.md) for the rules a patch has to follow.
 
-Then pick **Footstrap** in **System → System → Language and Style**, field "Design". That is the only
-thing you set on the router. For a specific version, pass the tag: `... | sh -s v0.9.0`.
-
-<br clear="right">
-
-## Building a luci-app?
-
-<br clear="right">
-
-
-The [developer devkit](https://vizzletf.github.io/luci-theme-footstrap/) has the colour token grid,
-the component markup and a style checker you can paste into.
-
-There is also a written guide:
-[how to style a LuCI app so it works under any theme](docs/20-luci-app-styling-guide.md) — CSS
-lifetime, namespacing, the colour contract, dark-mode detection, and what this theme does when an app
-breaks the rules. Drawn from 30 real apps and checked on a router.
+Writing a `luci-app`? Read
+[how to style it so it works under any theme](docs/luci-app-styling-guide.md), and paste your CSS
+into the [devkit](https://vizzletf.github.io/luci-theme-footstrap/) — token grid, component markup,
+style checker.
